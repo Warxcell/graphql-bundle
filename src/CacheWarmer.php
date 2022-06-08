@@ -26,7 +26,7 @@ final class CacheWarmer implements CacheWarmerInterface
      */
     public function warmUp(string $cacheDir)
     {
-        $schema = $this->schemaBuilder->build();
+        $schema = $this->schemaBuilder->makeSchema();
         $schema->assertValid();
     }
 }

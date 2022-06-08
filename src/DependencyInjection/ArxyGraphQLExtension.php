@@ -9,10 +9,8 @@ use Arxy\GraphQL\Plugin;
 use Arxy\GraphQL\ResolverMapInterface;
 use Arxy\GraphQL\SchemaBuilder;
 use Exception;
-use GraphQL\Type\Schema;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
-use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
@@ -39,11 +37,6 @@ final class ArxyGraphQLExtension extends Extension
         $schemaBuilderDef->setArgument('$debug', $config['debug']);
 
         $controllerDef = $container->getDefinition(GraphQL::class);
-
-        $schemaDef = new Definition(Schema::class);
-        $schemaDef->setFactory([new Reference(SchemaBuilder::class), 'build']);
-
-        $controllerDef->setArgument('$schema', $schemaDef);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $config['debug']);
 
