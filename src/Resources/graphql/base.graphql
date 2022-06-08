@@ -1,0 +1,1 @@
+directive @specifiedBy(url: String!) on SCALAR

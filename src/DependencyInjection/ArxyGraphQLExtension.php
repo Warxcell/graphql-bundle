@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Arxy\GraphQL\DependencyInjection;
+
+use Arxy\GraphQL\Controller\GraphQL;
+use Arxy\GraphQL\Plugin;
+use Arxy\GraphQL\ResolverMapInterface;
+use Arxy\GraphQL\SchemaBuilder;
+use Exception;
+use GraphQL\Type\Schema;
+use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
+use Symfony\Component\DependencyInjection\Extension\Extension;
+use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
+use Symfony\Component\DependencyInjection\Reference;
+
+use function array_merge;
+
+final class ArxyGraphQLExtension extends Extension
+{
+    /**
+     * @throws Exception
+     */
+    public function load(array $configs, ContainerBuilder $container)
+    {
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
+        $loader->load('services.php');
+
+        $configuration = new Configuration();
+        $config = $this->processConfiguration($configuration, $configs);
+
+        $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
+
+        $schemaBuilderDef->setArgument('$schemas', array_merge([__DIR__ . '/../Resources/graphql'], $config['schema']));
+        $schemaBuilderDef->setArgument('$cacheDir', $config['cache_dir']);
+        $schemaBuilderDef->setArgument('$debug', $config['debug']);
+
+        $controllerDef = $container->getDefinition(GraphQL::class);
+
+        $schemaDef = new Definition(Schema::class);
+        $schemaDef->setFactory([new Reference(SchemaBuilder::class), 'build']);
+
+        $controllerDef->setArgument('$schema', $schemaDef);
+        $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
+        $controllerDef->setArgument('$debug', $config['debug']);
+
+        $container->registerForAutoconfiguration(ResolverMapInterface::class)->addTag('arxy.graphql.resolver_map');
+        $container->registerForAutoconfiguration(Plugin::class)->addTag('arxy.graphql.plugin');
+    }
+}
