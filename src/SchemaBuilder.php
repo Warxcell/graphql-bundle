@@ -7,18 +7,20 @@ namespace Arxy\GraphQL;
 use Closure;
 use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
+use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
 use GraphQL\Language\AST\ScalarTypeDefinitionNode;
 use GraphQL\Language\AST\TypeDefinitionNode;
+use GraphQL\Language\AST\TypeExtensionNode;
 use GraphQL\Language\AST\UnionTypeDefinitionNode;
 use GraphQL\Language\Parser;
 use GraphQL\Language\Printer;
-use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\AST;
+use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use Symfony\Component\Finder\Finder;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
@@ -103,24 +105,23 @@ final class SchemaBuilder
             $document = AST::fromArray(require $cacheFile);
         }
 
+        $nonExtendDefs = [];
+        $extendDefs = [];
+        foreach ($document->definitions as $definition) {
+            if ($definition instanceof TypeExtensionNode) {
+                $extendDefs[] = $definition;
+            } else {
+                $nonExtendDefs[] = $definition;
+            }
+        }
+
         $options = [
             'assumeValid' => $this->debug,
             'assumeValidSDL' => $this->debug,
         ];
-        //$schema = BuildSchema::build($document, null, $options);
+        $schema = BuildSchema::build(new DocumentNode(['definitions' => $nonExtendDefs]), $typeConfigDecorator, $options);
 
-        $schema = new Schema([
-            'query' => new ObjectType([
-                'name' => 'Query',
-                'resolveField' => $defaultResolver,
-            ]),
-            'mutation' => new ObjectType([
-                'name' => 'Mutation',
-                'resolveField' => $defaultResolver,
-            ]),
-        ]);
-
-        return SchemaExtender::extend($schema, $document, $options, $typeConfigDecorator);
+        return SchemaExtender::extend($schema, new DocumentNode(['definitions' => $extendDefs]), $options, $typeConfigDecorator);
     }
 
     /**
@@ -134,7 +135,14 @@ final class SchemaBuilder
         iterable $plugins,
         PropertyAccessorInterface $propertyAccessor,
     ): Schema {
-        $resolvers = [];
+        $resolvers = [
+            'Query' => [
+                'ping' => static fn (): string => 'pong',
+            ],
+            'Mutation' => [
+                'ping' => static fn (): string => 'pong',
+            ],
+        ];
         foreach ($resolverMaps as $resolverMap) {
             foreach ($resolverMap->map() as $objectType => $fields) {
                 if (is_array($fields)) {
