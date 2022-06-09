@@ -39,6 +39,7 @@ final class ArxyGraphQLExtension extends Extension
         $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $config['debug']);
+        $controllerDef->setArgument('$logger', new Reference($config['logger']));
 
         $container->registerForAutoconfiguration(ResolverMapInterface::class)->addTag('arxy.graphql.resolver_map');
         $container->registerForAutoconfiguration(Plugin::class)->addTag('arxy.graphql.plugin');

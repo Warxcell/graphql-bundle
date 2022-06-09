@@ -16,14 +16,18 @@ use GraphQL\Type\Schema;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\LogLevel;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 use function assert;
+use function get_class;
 use function iterator_to_array;
 use function json_decode;
+use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -43,7 +47,8 @@ final class GraphQL
         Schema $schema,
         SyncPromiseAdapter $promiseAdapter,
         bool $debug,
-        iterable $plugins
+        iterable $plugins,
+        LoggerInterface $logger
     ) {
         $plugins = iterator_to_array($plugins);
 
@@ -99,6 +104,26 @@ final class GraphQL
                     ): mixed => $resolveContext([], $params, $doc, $operationType)
                 )
                 ->setSchema($schema)
+                ->setErrorsHandler(static function (array $errors, Closure $formatter) use ($logger): array {
+                    $formatted = [];
+
+                    foreach ($errors as $error) {
+                        $message = sprintf(
+                            '[GraphQL] %s: %s[%d] (caught throwable) at %s line %s.',
+                            get_class($error),
+                            $error->getMessage(),
+                            $error->getCode(),
+                            $error->getFile(),
+                            $error->getLine()
+                        );
+
+                        $logger->log(LogLevel::ERROR, $message, ['exception' => $error]);
+
+                        $formatted[] = $formatter($error);
+                    }
+
+                    return $formatted;
+                })
                 ->setDebugFlag($debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE)
                 ->setPromiseAdapter($promiseAdapter)
                 ->setPersistentQueryLoader(static function (string $queryId, OperationParams $operationParams) {
