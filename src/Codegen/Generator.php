@@ -456,8 +456,8 @@ class Generator
     ): ClassLike {
         $class = new ClassType($definitionNode->name->value);
         $class->setFinal();
-        $method = $class->addMethod('__construct');
         if (count($definitionNode->fields) > 0) {
+            $method = $class->addMethod('__construct');
             foreach ($definitionNode->fields as $field) {
                 $this->handleInputValue($method, $field);
             }
