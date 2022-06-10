@@ -23,7 +23,7 @@ final class SecurityPlugin extends AbstractPlugin
     public function resolveContext(Closure $next): Closure
     {
         return function (
-            array $context,
+            mixed $context,
             OperationParams $params,
             DocumentNode $doc,
             string $operationType
@@ -44,7 +44,7 @@ final class SecurityPlugin extends AbstractPlugin
 
     public function onResolverCalled(Closure $next): Closure
     {
-        return function ($parent, array $args, $context, ResolveInfo $info) use ($next) {
+        return function (mixed $parent, mixed $args, mixed $context, ResolveInfo $info) use ($next) {
             $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
 
             if ($isGrantedDirective) {

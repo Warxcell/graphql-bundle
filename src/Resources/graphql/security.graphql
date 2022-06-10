@@ -1,1 +1,0 @@
-directive @isGranted(role: String!) on FIELD_DEFINITION

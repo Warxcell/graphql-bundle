@@ -9,12 +9,13 @@
         "symfony/dependency-injection": "*",
         "symfony/config": "*",
         "symfony/http-kernel": "*",
-        "symfony/finder": "*",
-        "symfony/property-access": "*",
-        "psr/http-factory": "*"
+        "psr/http-factory": "*",
+        "symfony/serializer": "*",
+        "symfony/console": "*"
     },
     "require-dev": {
-        "symfony/security": "*"
+        "symfony/security": "*",
+        "nette/php-generator": "^4.0"
     },
     "version": "1.0.0",
     "autoload": {

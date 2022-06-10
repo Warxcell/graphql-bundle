@@ -7,6 +7,7 @@ namespace Arxy\GraphQL;
 use Closure;
 use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
+use GraphQL\Executor\Executor;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
@@ -22,20 +23,16 @@ use GraphQL\Type\Schema;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
-use Symfony\Component\Finder\Finder;
-use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
+use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 
-use function array_map;
 use function assert;
-use function enum_exists;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
-use function implode;
-use function is_array;
 use function is_dir;
 use function iterator_to_array;
 use function mkdir;
+use function sprintf;
 use function var_export;
 
 use const PHP_EOL;
@@ -45,8 +42,11 @@ use const PHP_EOL;
  */
 final class SchemaBuilder
 {
+    /**
+     * @param iterable<Module> $modules
+     */
     public function __construct(
-        private readonly array $schemas,
+        private readonly iterable $modules,
         private readonly string $cacheDir,
         private readonly bool $debug
     ) {
@@ -56,52 +56,30 @@ final class SchemaBuilder
      * @throws SyntaxError
      * @throws Error
      */
-    public function makeSchema(?Closure $typeConfigDecorator = null, ?Closure $defaultResolver = null): Schema
+    public function makeSchema(?Closure $typeConfigDecorator = null): Schema
     {
         if (!is_dir($this->cacheDir)) {
             mkdir($this->cacheDir);
         }
 
         $cacheFile = $this->cacheDir . '/schema.php';
-        //$cacheFileMain = $this->cacheDir . '/main_schema.php';
 
         if ($this->debug || !file_exists($cacheFile)) {
-            $schemaContent = implode(
-                PHP_EOL,
-                array_map(static function (string $fileOrDir): string {
-                    $finder = new Finder();
-                    $finder->files()->in($fileOrDir)->name('*.graphql');
+            $schemaContent = file_get_contents(__DIR__ . '/Resources/graphql/schema.graphql');
 
-                    $schema = '';
-                    foreach ($finder as $file) {
-                        $schema .= PHP_EOL . file_get_contents($file->getRealPath());
-                    }
+            foreach ($this->modules as $module) {
+                $schemaContent .= $module::getSchema() . PHP_EOL;
+            }
 
-                    return $schema;
-                }, $this->schemas)
-            );
             $document = Parser::parse($schemaContent);
             file_put_contents(
                 $cacheFile,
                 "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export(AST::toArray($document), true) . ";\n"
             );
 
-            //$main = Parser::parse(file_get_contents(__DIR__ . '/schema.graphql'));
-            //file_put_contents($cacheFileMain, "<?php\n\ndeclare(strict_types=1);\n\nreturn " . var_export(AST::toArray($main), true) . ";\n");
-
-            //            $schema = '';
-            //foreach ($this->graphqlDirectives as $graphqlDirective) {
-            //    $schema .= PHP_EOL . Printer::doPrint($graphqlDirective);
-            //}
-            //foreach ($this->graphqlTypes as $graphqlType) {
-            //    $schema .= PHP_EOL . Printer::doPrint($graphqlType);
-            //}
-            //file_put_contents($cacheFile, $schema);
-
             $finalSchema = Printer::doPrint($document);
             file_put_contents($this->cacheDir . '/schema.graphql', $finalSchema);
         } else {
-            //$main = AST::fromArray(require $cacheFileMain);
             $document = AST::fromArray(require $cacheFile);
         }
 
@@ -119,63 +97,51 @@ final class SchemaBuilder
             'assumeValid' => $this->debug,
             'assumeValidSDL' => $this->debug,
         ];
-        $schema = BuildSchema::build(new DocumentNode(['definitions' => $nonExtendDefs]), $typeConfigDecorator, $options);
+        $schema = BuildSchema::build(
+            new DocumentNode(['definitions' => $nonExtendDefs]),
+            $typeConfigDecorator,
+            $options
+        );
 
-        return SchemaExtender::extend($schema, new DocumentNode(['definitions' => $extendDefs]), $options, $typeConfigDecorator);
+        return SchemaExtender::extend(
+            $schema,
+            new DocumentNode(['definitions' => $extendDefs]),
+            $options,
+            $typeConfigDecorator
+        );
     }
 
     /**
-     * @param iterable<ResolverMapInterface> $resolverMaps
+     * @param array<string, array<string, object>> $resolvers
      * @param iterable<Plugin> $plugins
      * @throws Error
      * @throws SyntaxError
      */
     public function makeExecutableSchema(
-        iterable $resolverMaps,
+        array $resolvers,
+        array $argumentsMapping,
+        array $enums,
+        DenormalizerInterface $serializer,
         iterable $plugins,
-        PropertyAccessorInterface $propertyAccessor,
     ): Schema {
-        $resolvers = [
-            'Query' => [
-                'ping' => static fn (): string => 'pong',
-            ],
-            'Mutation' => [
-                'ping' => static fn (): string => 'pong',
-            ],
-        ];
-        foreach ($resolverMaps as $resolverMap) {
-            foreach ($resolverMap->map() as $objectType => $fields) {
-                if (is_array($fields)) {
-                    $resolvers[$objectType] = ($resolvers[$objectType] ?? []) + $fields;
-                } else {
-                    $resolvers[$objectType] = $fields;
-                }
-            }
-        }
-
-        $resolver = static function ($objectValue, $args, $contextValue, ResolveInfo $info) use (
-            $resolvers,
-            $propertyAccessor
+        $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
+            $resolvers
         ) {
-            $value = null;
             if (isset($resolvers[$info->parentType->name][$info->fieldName])) {
-                $value = $resolvers[$info->parentType->name][$info->fieldName](
-                    $objectValue,
-                    $args,
-                    $contextValue,
-                    $info
-                );
-            } elseif ($objectValue) {
-                $fieldName = $info->fieldName;
-                if (is_array($objectValue)) {
-                    $fieldName = '[' . $fieldName . ']';
-                }
-                $value = $propertyAccessor->getValue($objectValue, $fieldName);
-            }
+                $objectResolver = $resolvers[$info->parentType->name][$info->fieldName];
 
-            return $value instanceof Closure
-                ? $value($objectValue, $args, $contextValue, $info)
-                : $value;
+                return call_user_func_array(
+                    [$objectResolver, $info->fieldName],
+                    [
+                        $objectValue,
+                        $args,
+                        $contextValue,
+                        $info,
+                    ]
+                );
+            } else {
+                return Executor::defaultFieldResolver($objectValue, $args, $contextValue, $info);
+            }
         };
 
         $plugins = iterator_to_array($plugins);
@@ -193,44 +159,55 @@ final class SchemaBuilder
         };
         $resolver = $resolveMiddleware($plugins, 0);
 
+        $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
+            $resolver,
+            $argumentsMapping,
+            $serializer
+        ) {
+            if (isset($argumentsMapping[$info->parentType->name][$info->fieldName])) {
+                $args = $serializer->denormalize($args, $argumentsMapping[$info->parentType->name][$info->fieldName]);
+            }
+
+            return $resolver($objectValue, $args, $contextValue, $info);
+        };
+
         $typeConfigDecorator = static function (
             array $typeConfig,
             TypeDefinitionNode $typeDefinitionNode,
             array $definitionMap
-        ) use ($resolvers, $resolver) {
+        ) use ($resolvers, $resolver, $enums) {
             $name = $typeConfig['name'];
-            $typeResolvers = $resolvers[$name] ?? [];
+            $typeResolvers = $resolvers[$name] ?? null;
 
             if ($typeDefinitionNode instanceof UnionTypeDefinitionNode || $typeDefinitionNode instanceof InterfaceTypeDefinitionNode) {
-                $resolveType = $typeResolvers[ResolverMapInterface::RESOLVE_TYPE] ?? null;
-                if ($resolveType) {
-                    $typeConfig['resolveType'] = static function ($objectValue, $context, ResolveInfo $info) use (
-                        $resolveType,
-                        $definitionMap
-                    ) {
-                        $rawType = $resolveType($objectValue, $context, $info);
+                assert($typeResolvers instanceof UnionInterfaceResolver, sprintf('Missing resolvers for union/interface %s', $name));
 
-                        if (!$rawType) {
-                            return null;
-                        }
+                $resolveType = [$typeResolvers, 'resolveType'];
 
-                        return $info->schema->getType($rawType);
-                    };
-                }
+                $typeConfig['resolveType'] = static function ($objectValue, $context, ResolveInfo $info) use (
+                    $resolveType,
+                    $definitionMap
+                ) {
+                    $rawType = $resolveType($objectValue, $context, $info);
+
+                    if (!$rawType) {
+                        return null;
+                    }
+
+                    return $info->schema->getType($rawType);
+                };
             } elseif ($typeDefinitionNode instanceof ScalarTypeDefinitionNode) {
-                $typeConfig['serialize'] = $typeResolvers[ResolverMapInterface::SERIALIZE] ?? null;
-                $typeConfig['parseValue'] = $typeResolvers[ResolverMapInterface::PARSE_VALUE] ?? null;
-                $typeConfig['parseLiteral'] = $typeResolvers[ResolverMapInterface::PARSE_LITERAL] ?? null;
+                assert($typeResolvers instanceof ScalarResolver, sprintf('Missing resolvers for scalar %s', $name));
+                $typeConfig['serialize'] = [$typeResolvers, 'serialize'];
+                $typeConfig['parseValue'] = [$typeResolvers, 'parseValue'];
+                $typeConfig['parseLiteral'] = [$typeResolvers, 'parseLiteral'];
             } elseif ($typeDefinitionNode instanceof ObjectTypeDefinitionNode) {
                 $typeConfig['resolveField'] = $resolver;
             } elseif ($typeDefinitionNode instanceof EnumTypeDefinitionNode) {
-                if (is_array($typeResolvers)) {
+                $enum = $enums[$typeDefinitionNode->name->value] ?? null;
+                if ($enum) {
                     foreach ($typeConfig['values'] as $key => &$value) {
-                        $value['value'] = $typeResolvers[$key] ?? $key;
-                    }
-                } elseif (enum_exists($typeResolvers)) {
-                    foreach ($typeConfig['values'] as $key => &$value) {
-                        $value['value'] = $typeResolvers::from($key);
+                        $value['value'] = $enum::from($key);
                     }
                 }
             }
@@ -238,6 +215,6 @@ final class SchemaBuilder
             return $typeConfig;
         };
 
-        return $this->makeSchema($typeConfigDecorator, $resolver);
+        return $this->makeSchema($typeConfigDecorator);
     }
 }

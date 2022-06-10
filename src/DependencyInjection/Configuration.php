@@ -20,10 +20,6 @@ final class Configuration implements ConfigurationInterface
         // @formatter:off
         $rootNode
             ->children()
-                ->arrayNode('schema')
-                    ->scalarPrototype()->end()
-                    ->isRequired()
-                ->end()
                 ->scalarNode('debug')
                     ->defaultValue('%kernel.debug%')
                     ->cannotBeEmpty()
