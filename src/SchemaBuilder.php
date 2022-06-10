@@ -7,7 +7,6 @@ namespace Arxy\GraphQL;
 use Closure;
 use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
-use GraphQL\Executor\Executor;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
@@ -23,6 +22,7 @@ use GraphQL\Type\Schema;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
+use LogicException;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 
 use function assert;
@@ -127,21 +127,17 @@ final class SchemaBuilder
         $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
             $resolvers
         ) {
-            if (isset($resolvers[$info->parentType->name][$info->fieldName])) {
-                $objectResolver = $resolvers[$info->parentType->name][$info->fieldName];
+            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(sprintf('Could not resolve field %s.%s', $info->parentType->name, $info->fieldName));
 
-                return call_user_func_array(
-                    [$objectResolver, $info->fieldName],
-                    [
-                        $objectValue,
-                        $args,
-                        $contextValue,
-                        $info,
-                    ]
-                );
-            } else {
-                return Executor::defaultFieldResolver($objectValue, $args, $contextValue, $info);
-            }
+            return call_user_func_array(
+                [$objectResolver, $info->fieldName],
+                [
+                    $objectValue,
+                    $args,
+                    $contextValue,
+                    $info,
+                ]
+            );
         };
 
         $plugins = iterator_to_array($plugins);

@@ -281,7 +281,8 @@ class Generator
         ObjectTypeDefinitionNode|ObjectTypeExtensionNode $definitionNode
     ): ?ClassLike {
         $class = null;
-        $type = $module::getTypeMapping()[$definitionNode->name->value] ?? null;
+        //$type = $module::getTypeMapping()[$definitionNode->name->value] ?? null;
+        $type = $this->allModulesTypeMapping[$definitionNode->name->value] ?? null;
         if (!$type) {
             $class = new ClassType($definitionNode->name->value);
             $class->setFinal();
@@ -294,9 +295,11 @@ class Generator
                     ->setNullable(get_class($field->type) !== NonNullTypeNode::class);
             }
             $this->addGeneratedType($module, $class);
+
+            $type = $module::getCodegenNamespace() . '\\' . $class->getName();
         }
 
-        $resolvers = $this->generateResolversForObject($module, $definitionNode);
+        $resolvers = $this->generateResolversForObject($module, $definitionNode, $type);
         $this->writeGeneratedType($module, $resolvers);
 
         return $class;
@@ -308,7 +311,8 @@ class Generator
      */
     private function generateResolversForObject(
         string $module,
-        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $definitionNode
+        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $definitionNode,
+        string $parentType
     ): ClassLike {
         $type = new InterfaceType($definitionNode->name->value . 'Resolver');
         $type->addExtend(Resolver::class);
@@ -329,9 +333,7 @@ class Generator
             $method = $type->addMethod($field->name->value);
             $method->setPublic();
             $method->setAbstract();
-            $method->addParameter('parent')->setType(
-                $this->allModulesTypeMapping[$definitionNode->name->value] ?? 'mixed'
-            );
+            $method->addParameter('parent')->setType($parentType);
             $method->addParameter('args')->setType($argType);
             $method->addParameter('context')->setType('mixed');
             $method->addParameter('info')->setType(ResolveInfo::class);
