@@ -51,6 +51,7 @@ use Psr\Log\NullLogger;
 
 use function array_map;
 use function array_merge;
+use function count;
 use function file_put_contents;
 use function get_class;
 use function glob;
@@ -293,13 +294,15 @@ class Generator
         if (!$type) {
             $class = new ClassType($definitionNode->name->value);
             $class->setFinal();
-            $method = $class->addMethod('__construct');
 
-            foreach ($definitionNode->fields as $field) {
-                $method->addPromotedParameter($field->name->value)
-                    ->setReadOnly()
-                    ->setType($this->getPhpTypeFromGraphQLType($field->type))
-                    ->setNullable(get_class($field->type) !== NonNullTypeNode::class);
+            if (count($definitionNode->fields) > 0) {
+                $method = $class->addMethod('__construct');
+                foreach ($definitionNode->fields as $field) {
+                    $method->addPromotedParameter($field->name->value)
+                        ->setReadOnly()
+                        ->setType($this->getPhpTypeFromGraphQLType($field->type))
+                        ->setNullable(get_class($field->type) !== NonNullTypeNode::class);
+                }
             }
             $this->addGeneratedType($module, $class);
 
@@ -355,10 +358,15 @@ class Generator
 
             $genericsTypes = $this->generateUnion($this->getGenericsType($field->type));
             $promise = $this->wrapInPromise($genericsTypes);
-            $method->addComment(sprintf('@return %s', $this->generateUnion([
-                $genericsTypes,
-                $promise,
-            ])));
+            $method->addComment(
+                sprintf(
+                    '@return %s',
+                    $this->generateUnion([
+                        $genericsTypes,
+                        $promise,
+                    ])
+                )
+            );
         }
 
         return $type;
@@ -393,7 +401,12 @@ class Generator
     private function getGenericsType(TypeNode $typeNode, ?TypeNode $parentType = null): array
     {
         return match (get_class($typeNode)) {
-            ListTypeNode::class => [sprintf('iterable<%s>', $this->generateUnion($this->getGenericsType($typeNode->type, $typeNode)))],
+            ListTypeNode::class => [
+                sprintf(
+                    'iterable<%s>',
+                    $this->generateUnion($this->getGenericsType($typeNode->type, $typeNode))
+                ),
+            ],
             NonNullTypeNode::class => $this->getGenericsType($typeNode->type, $typeNode),
             NamedTypeNode::class => (function () use ($typeNode, $parentType) {
                 $type = $this->fixTypeForGenerics($this->handleDefinitionByName($typeNode->name->value));
@@ -420,10 +433,12 @@ class Generator
             sprintf('%s%sArgs', ucfirst($objectType->name->value), ucfirst($definitionNode->name->value))
         );
         $class->setFinal();
-        $method = $class->addMethod('__construct');
 
-        foreach ($definitionNode->arguments as $field) {
-            $this->handleInputValue($method, $field);
+        if (count($definitionNode->arguments) > 0) {
+            $method = $class->addMethod('__construct');
+            foreach ($definitionNode->arguments as $field) {
+                $this->handleInputValue($method, $field);
+            }
         }
 
         $this->addGeneratedType($module, $class);
@@ -442,9 +457,10 @@ class Generator
         $class = new ClassType($definitionNode->name->value);
         $class->setFinal();
         $method = $class->addMethod('__construct');
-
-        foreach ($definitionNode->fields as $field) {
-            $this->handleInputValue($method, $field);
+        if (count($definitionNode->fields) > 0) {
+            foreach ($definitionNode->fields as $field) {
+                $this->handleInputValue($method, $field);
+            }
         }
 
         $this->addGeneratedType($module, $class);
@@ -458,12 +474,20 @@ class Generator
     private function handleInputValue(Method $method, InputValueDefinitionNode $definitionNode): void
     {
         $nullable = get_class($definitionNode->type) !== NonNullTypeNode::class;
-        ($nullable ? $method->addPromotedParameter($definitionNode->name->value, null) : $method->addPromotedParameter($definitionNode->name->value))
+        ($nullable ? $method->addPromotedParameter($definitionNode->name->value, null) : $method->addPromotedParameter(
+            $definitionNode->name->value
+        ))
             ->setReadOnly()
             ->setType($this->getPhpTypeFromGraphQLType($definitionNode->type))
             ->setNullable($nullable);
 
-        $method->addComment(sprintf('@param %s $%s', $this->generateUnion($this->getGenericsType($definitionNode->type)), $definitionNode->name->value));
+        $method->addComment(
+            sprintf(
+                '@param %s $%s',
+                $this->generateUnion($this->getGenericsType($definitionNode->type)),
+                $definitionNode->name->value
+            )
+        );
     }
 
     /**
