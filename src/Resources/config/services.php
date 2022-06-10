@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
-use Arxy\GraphQL\Command\Codegen;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\SchemaBuilder;
 use Arxy\GraphQL\Serializer\BackedEnumNormalizer;
@@ -20,9 +19,6 @@ return function (ContainerConfigurator $configurator) {
         ->exclude('../../{Resources,DependencyInjection}');
 
     $services->set(SchemaBuilder::class)
-        ->arg('$modules', tagged_iterator('arxy.graphql.module'));
-
-    $services->set(Codegen::class)
         ->arg('$modules', tagged_iterator('arxy.graphql.module'));
 
     $services->set('arxy.graphql.executable_schema', Schema::class)

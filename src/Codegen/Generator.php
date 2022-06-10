@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Codegen;
 
 use Arxy\GraphQL\Enum;
-use Arxy\GraphQL\EnumResolver;
 use Arxy\GraphQL\Module;
 use Arxy\GraphQL\Resolver;
 use Arxy\GraphQL\ScalarResolver;
@@ -47,6 +46,8 @@ use Nette\PhpGenerator\InterfaceType;
 use Nette\PhpGenerator\Method;
 use Nette\PhpGenerator\PhpFile;
 use Nette\PhpGenerator\PhpNamespace;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 use function array_map;
 use function array_merge;
@@ -85,7 +86,8 @@ class Generator
      * @throws SyntaxError
      */
     public function __construct(
-        private readonly iterable $modules
+        private readonly iterable $modules,
+        private readonly LoggerInterface|null $logger = new NullLogger()
     ) {
         $mappings = [];
         /** @var DocumentNode[] $allDocs */
@@ -106,7 +108,12 @@ class Generator
         $file = new PhpFile();
         $file->setStrictTypes();
         $file->addNamespace((new PhpNamespace($module::getCodegenNamespace()))->add($type));
-        file_put_contents(sprintf('%s/%s.php', $module::getCodegenDirectory(), $type->getName()), $file);
+        $file->addComment('Auto-Generated');
+
+        $filename = sprintf('%s/%s.php', $module::getCodegenDirectory(), $type->getName());
+        file_put_contents($filename, $file);
+
+        $this->logger->info(sprintf('Writing %s', $filename));
     }
 
     /**
@@ -465,18 +472,11 @@ class Generator
     public function generateEnumType(
         string $module,
         EnumTypeDefinitionNode|EnumTypeExtensionNode $definitionNode
-    ): ClassLike {
+    ): ?ClassLike {
         $typeName = $module::getTypeMapping()[$definitionNode->name->value] ?? null;
 
         if (null !== $typeName) {
-            $type = new InterfaceType($definitionNode->name->value);
-            $type->addExtend(EnumResolver::class);
-
-            foreach ($definitionNode->values as $value) {
-                $type->addMethod($value->name->value)->setPublic()->setReturnType($typeName);
-            }
-
-            return $type;
+            return null;
         } else {
             $enum = new EnumType($definitionNode->name->value);
             $enum->addAttribute(Enum::class);

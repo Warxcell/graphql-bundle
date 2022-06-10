@@ -14,6 +14,8 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 use function count;
+use function implode;
+use function in_array;
 use function sprintf;
 use function str_replace;
 
@@ -39,23 +41,25 @@ final class ArxyGraphQLBundle extends Bundle
                         continue;
                     }
                     assert($reflector instanceof ReflectionClass);
+                    if (in_array($reflector->getName(), [Query::class, Mutation::class])) {
+                        continue;
+                    }
+
                     if (count($reflector->getAttributes(Enum::class)) > 0) {
                         $enums[$reflector->getShortName()] = $reflector->getName();
                     }
 
-                    //$implements = $reflector->getInterfaces();
-                    //foreach ($implements as $interface) {
-                    //    if ($interface->implementsInterface(Resolver::class)) {
-                    //        $graphqlName = str_replace('Resolver', '', $interface->getShortName());
-                    //
-                    //        $objectTypes[$graphqlName] = [];
-                    //
-                    //        foreach ($interface->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
-                    //            $objectTypes[$graphqlName][] = $method->getName();
-                    //        }
-                    //        break;
-                    //    }
-                    //}
+                    if ($reflector->isInterface() && $reflector->implementsInterface(Resolver::class)) {
+                        if ($reflector->implementsInterface(Resolver::class)) {
+                            $graphqlName = str_replace('Resolver', '', $reflector->getShortName());
+
+                            $objectTypes[$graphqlName] ??= [];
+
+                            foreach ($reflector->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
+                                $objectTypes[$graphqlName][] = $method->getName();
+                            }
+                        }
+                    }
                 }
 
                 $schemaBuilder = $container->getDefinition('arxy.graphql.executable_schema');
@@ -100,24 +104,32 @@ final class ArxyGraphQLBundle extends Bundle
                     }
                 }
 
-                //$objectWithNoResolvers = [];
-                //$objectWithMissingFields = [];
-                //foreach ($objectTypes as $objectType => $fields) {
-                //    if (!isset($resolvers[$objectType])) {
-                //        $objectWithNoResolvers[] = $objectType;
-                //    } else {
-                //        foreach ($fields as $field) {
-                //            if (!$resolvers[$objectType] instanceof Reference && !isset($resolvers[$objectType][$field])) {
-                //                $objectWithMissingFields[$objectType][] = $field;
-                //            }
-                //        }
-                //    }
-                //}
-                //
-                //if (count($objectWithNoResolvers) > 0 || count($objectWithMissingFields) > 0) {
-                //    $messages = sprintf('Objects with no resolvers %s', implode(', ', $objectWithNoResolvers));
-                //    throw new LogicException($messages);
-                //}
+                $objectWithNoResolvers = [];
+                $objectWithMissingFields = [];
+                foreach ($objectTypes as $objectType => $fields) {
+                    if (!isset($resolvers[$objectType])) {
+                        $objectWithNoResolvers[] = $objectType;
+                    } else {
+                        foreach ($fields as $field) {
+                            if (!$resolvers[$objectType] instanceof Reference && !isset($resolvers[$objectType][$field])) {
+                                $objectWithMissingFields[$objectType][] = $field;
+                            }
+                        }
+                    }
+                }
+
+                $hasObjectsWithNoResolvers = count($objectWithNoResolvers) > 0;
+                $hasObjectWithMissingFields = count($objectWithMissingFields) > 0;
+                if ($hasObjectsWithNoResolvers || $hasObjectWithMissingFields) {
+                    $messages = '';
+                    if ($hasObjectsWithNoResolvers) {
+                        $messages .= sprintf('ObjectType with no resolvers %s. ', implode(', ', $objectWithNoResolvers));
+                    }
+                    if ($hasObjectWithMissingFields) {
+                        $messages .= sprintf('ObjectType with missing fields %s. ', implode(', ', $objectWithMissingFields));
+                    }
+                    throw new LogicException($messages);
+                }
 
                 $schemaBuilder->setArgument('$argumentsMapping', $argumentsMapping);
                 $schemaBuilder->setArgument('$resolvers', $resolvers);
