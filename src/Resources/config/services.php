@@ -18,18 +18,11 @@ return function (ContainerConfigurator $configurator) {
     $services->load('Arxy\\GraphQL\\', '../../*')
         ->exclude('../../{Resources,DependencyInjection}');
 
-    $services->set(SchemaBuilder::class)
-        ->arg('$modules', tagged_iterator('arxy.graphql.module'));
-
     $services->set('arxy.graphql.executable_schema', Schema::class)
-        ->factory([service(SchemaBuilder::class), 'makeExecutableSchema'])
-        ->args([
-            '$plugins' => tagged_iterator('arxy.graphql.plugin'),
-        ]);
+        ->factory([service(SchemaBuilder::class), 'makeExecutableSchema']);
 
     $services->set(GraphQL::class)
         ->tag('controller.service_arguments')
-        ->arg('$plugins', tagged_iterator('arxy.graphql.plugin'))
         ->arg('$schema', service('arxy.graphql.executable_schema'));
 
     $services->set(BackedEnumNormalizer::class)

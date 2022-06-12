@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\Plugin;
+use Arxy\GraphQL\ContextFactoryInterface;
+use Arxy\GraphQL\ErrorHandlerInterface;
+use Arxy\GraphQL\Exception;
 use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
@@ -16,18 +18,13 @@ use GraphQL\Type\Schema;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use Psr\Log\LoggerInterface;
-use Psr\Log\LogLevel;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
-use function assert;
-use function get_class;
-use function iterator_to_array;
 use function json_decode;
-use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -39,7 +36,6 @@ final class GraphQL
      * @param Schema $schema
      * @param SyncPromiseAdapter $promiseAdapter
      * @param bool $debug
-     * @param iterable<Plugin> $plugins
      */
     public function __construct(
         ResponseFactoryInterface $responseFactory,
@@ -47,46 +43,9 @@ final class GraphQL
         Schema $schema,
         SyncPromiseAdapter $promiseAdapter,
         bool $debug,
-        iterable $plugins,
-        LoggerInterface $logger
+        ?ContextFactoryInterface $contextFactory,
+        ?ErrorHandlerInterface $errorsHandler
     ) {
-        $plugins = iterator_to_array($plugins);
-
-        $resolveMiddleware = static function (array $plugins, int $offset, Closure $resolver, Closure $resolve) use (
-            &$resolveMiddleware
-        ): Closure {
-            if (!isset($plugins[$offset])) {
-                return $resolver;
-            }
-            $next = $resolveMiddleware($plugins, $offset + 1, $resolver, $resolve);
-
-            $plugin = $plugins[$offset];
-
-            assert($plugin instanceof Plugin);
-
-            return $resolve($plugin, $next);
-        };
-
-        $resolveValue = $resolveMiddleware(
-            $plugins, 0, static fn (
-            mixed $value,
-            OperationParams $params,
-            DocumentNode $doc,
-            string $operationType
-        ): mixed => $value,
-            static fn (Plugin $plugin, Closure $next) => $plugin->resolveRootValue($next)
-        );
-
-        $resolveContext = $resolveMiddleware(
-            $plugins, 0, static fn (
-            array $context,
-            OperationParams $params,
-            DocumentNode $doc,
-            string $operationType
-        ) => $context,
-            static fn (Plugin $plugin, Closure $next) => $plugin->resolveContext($next)
-        );
-
         $server = new StandardServer(
             ServerConfig::create()
                 ->setRootValue(
@@ -94,35 +53,26 @@ final class GraphQL
                         OperationParams $params,
                         DocumentNode $doc,
                         string $operationType
-                    ): mixed => $resolveValue(null, $params, $doc, $operationType)
+                    ): mixed => null
                 )
-                ->setContext(
-                    static fn (
-                        OperationParams $params,
-                        DocumentNode $doc,
-                        string $operationType
-                    ): mixed => $resolveContext([], $params, $doc, $operationType)
-                )
+                ->setContext($contextFactory ? [$contextFactory, 'createContext'] : null)
                 ->setSchema($schema)
-                ->setErrorsHandler(static function (array $errors, Closure $formatter) use ($logger): array {
-                    $formatted = [];
+                ->setErrorsHandler(static function (
+                    array $errors,
+                    Closure $formatter
+                ) use ($errorsHandler): array {
+                    return $errorsHandler->handleErrors($errors, static function (Throwable $error) use (
+                        $formatter
+                    ): array {
+                        $formatted = $formatter($error);
 
-                    foreach ($errors as $error) {
-                        $message = sprintf(
-                            '[GraphQL] %s: %s[%d] (caught throwable) at %s line %s.',
-                            get_class($error),
-                            $error->getMessage(),
-                            $error->getCode(),
-                            $error->getFile(),
-                            $error->getLine()
-                        );
+                        $previous = $error->getPrevious();
+                        if ($previous instanceof Exception) {
+                            $formatted['extensions'] += $previous->getExtensions();
+                        };
 
-                        $logger->log(LogLevel::ERROR, $message, ['exception' => $error]);
-
-                        $formatted[] = $formatter($error);
-                    }
-
-                    return $formatted;
+                        return $formatted;
+                    });
                 })
                 ->setDebugFlag($debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE)
                 ->setPromiseAdapter($promiseAdapter)

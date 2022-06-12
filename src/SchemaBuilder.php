@@ -9,12 +9,16 @@ use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
+use GraphQL\Language\AST\EnumTypeExtensionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
+use GraphQL\Language\AST\InterfaceTypeExtensionNode;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
+use GraphQL\Language\AST\ObjectTypeExtensionNode;
 use GraphQL\Language\AST\ScalarTypeDefinitionNode;
 use GraphQL\Language\AST\TypeDefinitionNode;
 use GraphQL\Language\AST\TypeExtensionNode;
 use GraphQL\Language\AST\UnionTypeDefinitionNode;
+use GraphQL\Language\AST\UnionTypeExtensionNode;
 use GraphQL\Language\Parser;
 use GraphQL\Language\Printer;
 use GraphQL\Type\Definition\ResolveInfo;
@@ -23,14 +27,16 @@ use GraphQL\Utils\AST;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
+use Symfony\Component\Security\Core\Security;
 use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
+use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
 use function is_dir;
-use function iterator_to_array;
 use function mkdir;
 use function sprintf;
 use function var_export;
@@ -43,10 +49,10 @@ use const PHP_EOL;
 final class SchemaBuilder
 {
     /**
-     * @param iterable<Module> $modules
+     * @param iterable<string> $schemas
      */
     public function __construct(
-        private readonly iterable $modules,
+        private readonly iterable $schemas,
         private readonly string $cacheDir,
         private readonly bool $debug
     ) {
@@ -58,7 +64,7 @@ final class SchemaBuilder
      */
     public function makeSchema(?Closure $typeConfigDecorator = null): Schema
     {
-        if (!is_dir($this->cacheDir)) {
+        if ($this->debug && !is_dir($this->cacheDir)) {
             mkdir($this->cacheDir);
         }
 
@@ -67,8 +73,8 @@ final class SchemaBuilder
         if ($this->debug || !file_exists($cacheFile)) {
             $schemaContent = file_get_contents(__DIR__ . '/Resources/graphql/schema.graphql');
 
-            foreach ($this->modules as $module) {
-                $schemaContent .= $module::getSchema() . PHP_EOL;
+            foreach ($this->schemas as $schema) {
+                $schemaContent .= file_get_contents($schema) . PHP_EOL;
             }
 
             $document = Parser::parse($schemaContent);
@@ -94,8 +100,8 @@ final class SchemaBuilder
         }
 
         $options = [
-            'assumeValid' => $this->debug,
-            'assumeValidSDL' => $this->debug,
+            'assumeValid' => !$this->debug,
+            'assumeValidSDL' => !$this->debug,
         ];
         $schema = BuildSchema::build(
             new DocumentNode(['definitions' => $nonExtendDefs]),
@@ -113,58 +119,41 @@ final class SchemaBuilder
 
     /**
      * @param array<string, array<string, object>> $resolvers
-     * @param iterable<Plugin> $plugins
      * @throws Error
      * @throws SyntaxError
+     * TODO make executableSchema SOLID again (move codegen features (convert args from array to objects),serializer,security,validator to plugins/extensions/whatever)
      */
     public function makeExecutableSchema(
         array $resolvers,
         array $argumentsMapping,
         array $enums,
         DenormalizerInterface $serializer,
-        iterable $plugins,
+        Security $security,
+        ValidatorInterface $validator
     ): Schema {
         $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
-            $resolvers
-        ) {
-            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(sprintf('Could not resolve field %s.%s', $info->parentType->name, $info->fieldName));
-
-            return call_user_func_array(
-                [$objectResolver, $info->fieldName],
-                [
-                    $objectValue,
-                    $args,
-                    $contextValue,
-                    $info,
-                ]
-            );
-        };
-
-        $plugins = iterator_to_array($plugins);
-        $resolveMiddleware = static function ($plugins, $offset) use (&$resolveMiddleware, $resolver): Closure {
-            if (!isset($plugins[$offset])) {
-                return $resolver;
-            }
-            $next = $resolveMiddleware($plugins, $offset + 1);
-
-            $plugin = $plugins[$offset];
-
-            assert($plugin instanceof Plugin);
-
-            return $plugin->onResolverCalled($next);
-        };
-        $resolver = $resolveMiddleware($plugins, 0);
-
-        $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
-            $resolver,
             $argumentsMapping,
-            $serializer
+            $resolvers,
+            $serializer,
+            $validator,
+            $security
         ) {
+            $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
+
+            if ($isGrantedDirective && !$security->isGranted($isGrantedDirective['role'])) {
+                throw new AuthorizationError($isGrantedDirective['role']);
+            }
+
             if (isset($argumentsMapping[$info->parentType->name][$info->fieldName])) {
                 $args = $serializer->denormalize($args, $argumentsMapping[$info->parentType->name][$info->fieldName]);
+                $errors = $validator->validate($args);
+                if (count($errors) > 0) {
+                    throw new ConstraintViolationException($errors);
+                }
             }
+            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName));
 
-            return $resolver($objectValue, $args, $contextValue, $info);
+            return [$objectResolver, $info->fieldName]($objectValue, $args, $contextValue, $info);
         };
 
         $typeConfigDecorator = static function (
@@ -175,8 +164,12 @@ final class SchemaBuilder
             $name = $typeConfig['name'];
             $typeResolvers = $resolvers[$name] ?? null;
 
-            if ($typeDefinitionNode instanceof UnionTypeDefinitionNode || $typeDefinitionNode instanceof InterfaceTypeDefinitionNode) {
-                assert($typeResolvers instanceof UnionInterfaceResolver, sprintf('Missing resolvers for union/interface %s', $name));
+            if ($typeDefinitionNode instanceof UnionTypeDefinitionNode
+                || $typeDefinitionNode instanceof UnionTypeExtensionNode
+                || $typeDefinitionNode instanceof InterfaceTypeDefinitionNode
+                || $typeDefinitionNode instanceof InterfaceTypeExtensionNode
+            ) {
+                assert($typeResolvers !== null, sprintf('Missing resolvers for union/interface %s', $name));
 
                 $resolveType = [$typeResolvers, 'resolveType'];
 
@@ -193,18 +186,20 @@ final class SchemaBuilder
                     return $info->schema->getType($rawType);
                 };
             } elseif ($typeDefinitionNode instanceof ScalarTypeDefinitionNode) {
-                assert($typeResolvers instanceof ScalarResolver, sprintf('Missing resolvers for scalar %s', $name));
+                assert($typeResolvers !== null, sprintf('Missing resolvers for scalar %s', $name));
+
                 $typeConfig['serialize'] = [$typeResolvers, 'serialize'];
                 $typeConfig['parseValue'] = [$typeResolvers, 'parseValue'];
                 $typeConfig['parseLiteral'] = [$typeResolvers, 'parseLiteral'];
-            } elseif ($typeDefinitionNode instanceof ObjectTypeDefinitionNode) {
+            } elseif ($typeDefinitionNode instanceof ObjectTypeDefinitionNode || $typeDefinitionNode instanceof ObjectTypeExtensionNode) {
+                assert($typeResolvers !== null, sprintf('Missing resolvers for %s', $name));
+
                 $typeConfig['resolveField'] = $resolver;
-            } elseif ($typeDefinitionNode instanceof EnumTypeDefinitionNode) {
-                $enum = $enums[$typeDefinitionNode->name->value] ?? null;
-                if ($enum) {
-                    foreach ($typeConfig['values'] as $key => &$value) {
-                        $value['value'] = $enum::from($key);
-                    }
+            } elseif ($typeDefinitionNode instanceof EnumTypeDefinitionNode || $typeDefinitionNode instanceof EnumTypeExtensionNode) {
+                $enum = $enums[$name] ?? null;
+                assert($enum !== null, sprintf('Missing enum %s', $name));
+                foreach ($typeConfig['values'] as $key => &$value) {
+                    $value['value'] = $enum::from($key);
                 }
             }
 

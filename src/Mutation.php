@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-final class Mutation implements Resolver
+final class Mutation
 {
     public function ping(): string
     {

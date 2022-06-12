@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\Controller\GraphQL;
-use Arxy\GraphQL\Module;
-use Arxy\GraphQL\Plugin;
-use Arxy\GraphQL\Resolver;
+use Arxy\GraphQL\InterfaceResolverInterface;
+use Arxy\GraphQL\ResolverInterface;
+use Arxy\GraphQL\ScalarResolverInterface;
 use Arxy\GraphQL\SchemaBuilder;
+use Arxy\GraphQL\UnionResolverInterface;
 use Exception;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -32,14 +33,17 @@ final class ArxyGraphQLExtension extends Extension
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
         $schemaBuilderDef->setArgument('$cacheDir', $config['cache_dir']);
         $schemaBuilderDef->setArgument('$debug', $config['debug']);
+        $schemaBuilderDef->setArgument('$schemas', $config['schema']);
 
         $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $config['debug']);
-        $controllerDef->setArgument('$logger', new Reference($config['logger']));
+        $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
+        $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
 
-        $container->registerForAutoconfiguration(Module::class)->addTag('arxy.graphql.module');
-        $container->registerForAutoconfiguration(Plugin::class)->addTag('arxy.graphql.plugin');
-        $container->registerForAutoconfiguration(Resolver::class)->addTag('arxy.graphql.resolver');
+        $container->registerForAutoconfiguration(ResolverInterface::class)->addTag('arxy.graphql.resolver');
+        $container->registerForAutoconfiguration(ScalarResolverInterface::class)->addTag('arxy.graphql.resolver');
+        $container->registerForAutoconfiguration(InterfaceResolverInterface::class)->addTag('arxy.graphql.resolver');
+        $container->registerForAutoconfiguration(UnionResolverInterface::class)->addTag('arxy.graphql.resolver');
     }
 }

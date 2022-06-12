@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\DependencyInjection;
 
-use Psr\Log\LoggerInterface;
+use Arxy\GraphQL\ContextFactoryInterface;
+use Arxy\GraphQL\ErrorHandler;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -20,12 +21,22 @@ final class Configuration implements ConfigurationInterface
         // @formatter:off
         $rootNode
             ->children()
+                ->arrayNode('schema')
+                    ->isRequired()
+                    ->scalarPrototype()
+                        ->cannotBeEmpty()
+                    ->end()
+                ->end()
                 ->scalarNode('debug')
                     ->defaultValue('%kernel.debug%')
                     ->cannotBeEmpty()
                 ->end()
-                ->scalarNode('logger')
-                    ->defaultValue(LoggerInterface::class)
+                ->scalarNode('context_factory')
+                    ->defaultValue(ContextFactoryInterface::class)
+                    ->cannotBeEmpty()
+                ->end()
+                ->scalarNode('errors_handler')
+                    ->defaultValue(ErrorHandler::class)
                     ->cannotBeEmpty()
                 ->end()
                 ->scalarNode('cache_dir')
