@@ -22,6 +22,7 @@ use GraphQL\Language\AST\UnionTypeExtensionNode;
 use GraphQL\Language\Parser;
 use GraphQL\Language\Printer;
 use GraphQL\Type\Definition\ResolveInfo;
+use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\BuildSchema;
@@ -137,7 +138,7 @@ final class SchemaBuilder
             $serializer,
             $validator,
             $security
-        ) {
+        ): mixed {
             $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
 
             if ($isGrantedDirective && !$security->isGranted($isGrantedDirective['role'])) {
@@ -151,7 +152,9 @@ final class SchemaBuilder
                     throw new ConstraintViolationException($errors);
                 }
             }
-            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName));
+            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
+                    sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
+                );
 
             return [$objectResolver, $info->fieldName]($objectValue, $args, $contextValue, $info);
         };
@@ -160,7 +163,7 @@ final class SchemaBuilder
             array $typeConfig,
             TypeDefinitionNode $typeDefinitionNode,
             array $definitionMap
-        ) use ($resolvers, $resolver, $enums) {
+        ) use ($resolvers, $resolver, $enums): array {
             $name = $typeConfig['name'];
             $typeResolvers = $resolvers[$name] ?? null;
 
@@ -173,10 +176,11 @@ final class SchemaBuilder
 
                 $resolveType = [$typeResolvers, 'resolveType'];
 
-                $typeConfig['resolveType'] = static function ($objectValue, $context, ResolveInfo $info) use (
+                $typeConfig['resolveType'] = static function (mixed $objectValue, mixed $context, ResolveInfo $info) use
+                (
                     $resolveType,
                     $definitionMap
-                ) {
+                ): Type|null {
                     $rawType = $resolveType($objectValue, $context, $info);
 
                     if (!$rawType) {
