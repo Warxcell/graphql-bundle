@@ -5,13 +5,9 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Codegen;
 
 use Arxy\GraphQL\Enum;
-use Arxy\GraphQL\InterfaceResolver;
 use Arxy\GraphQL\InterfaceResolverInterface;
-use Arxy\GraphQL\Resolver;
 use Arxy\GraphQL\ResolverInterface;
-use Arxy\GraphQL\ScalarResolver;
 use Arxy\GraphQL\ScalarResolverInterface;
-use Arxy\GraphQL\UnionResolver;
 use Arxy\GraphQL\UnionResolverInterface;
 use Arxy\GraphQLCodegen\ModuleInterface;
 use Arxy\GraphQLCodegen\TypeDecoratorInterface;
@@ -28,17 +24,16 @@ use GraphQL\Language\AST\ScalarTypeDefinitionNode;
 use GraphQL\Language\AST\ScalarTypeExtensionNode;
 use GraphQL\Language\AST\UnionTypeDefinitionNode;
 use GraphQL\Language\AST\UnionTypeExtensionNode;
-use Nette\PhpGenerator\ClassLike;
+use Nette\PhpGenerator\ClassType;
+use Nette\PhpGenerator\EnumType;
 use Nette\PhpGenerator\InterfaceType;
-
-use function assert;
 
 final class TypeDecorator implements TypeDecoratorInterface
 {
     public function handleObject(
         ModuleInterface $module,
         ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
-        ClassLike $classLike
+        ClassType $classLike
     ): void {
     }
 
@@ -46,58 +41,61 @@ final class TypeDecorator implements TypeDecoratorInterface
         ModuleInterface $module,
         ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
         FieldDefinitionNode $fieldNode,
-        ClassLike $classLike
+        ClassType $classLike
     ): void {
     }
 
-    public function handleObjectResolver(
+    public function handleObjectResolverInterface(
         ModuleInterface $module,
         ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
-        ClassLike $classLike
+        InterfaceType $classLike
     ): void {
-        assert($classLike instanceof InterfaceType);
         $classLike->addExtend(ResolverInterface::class);
+    }
+
+    public function handleObjectResolverImplementation(
+        ModuleInterface $module,
+        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
+        ClassType $classLike
+    ): void {
     }
 
     public function handleInputObjectType(
         ModuleInterface $module,
         InputObjectTypeExtensionNode|InputObjectTypeDefinitionNode $definitionNode,
-        ClassLike $classLike
+        ClassType $classLike
     ): void {
     }
 
     public function handleEnumType(
         ModuleInterface $module,
         EnumTypeDefinitionNode|EnumTypeExtensionNode $enumNode,
-        ClassLike $classLike
+        EnumType $classLike
     ): void {
         $classLike->addAttribute(Enum::class);
     }
 
-    public function handleScalarResolver(
+    public function handleScalarResolverInterface(
         ModuleInterface $module,
         ScalarTypeExtensionNode|ScalarTypeDefinitionNode $scalarNode,
-        ClassLike $classLike
+        InterfaceType $classLike
     ): void {
-        assert($classLike instanceof InterfaceType);
         $classLike->addExtend(ScalarResolverInterface::class);
     }
 
-    public function handleInterfaceResolver(
+    public function handleInterfaceResolverInterface(
         ModuleInterface $module,
         InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $interfaceNode,
-        ClassLike $classLike
+        InterfaceType $classLike
     ): void {
-        assert($classLike instanceof InterfaceType);
         $classLike->addExtend(InterfaceResolverInterface::class);
     }
 
-    public function handleUnionResolver(
+    public function handleUnionResolverInterface(
         ModuleInterface $module,
         UnionTypeDefinitionNode|UnionTypeExtensionNode $unionNode,
-        ClassLike $classLike
+        InterfaceType $classLike
     ): void {
-        assert($classLike instanceof InterfaceType);
         $classLike->addExtend(UnionResolverInterface::class);
     }
 }
