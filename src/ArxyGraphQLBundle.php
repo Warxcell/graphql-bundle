@@ -80,9 +80,7 @@ final class ArxyGraphQLBundle extends Bundle
 
                         if ($reflection->implementsInterface(ScalarResolverInterface::class)) {
                             $resolvers[$graphqlName] = new Reference($serviceId);
-                        } elseif ($reflection->implementsInterface(
-                                UnionResolverInterface::class
-                            )
+                        } elseif ($reflection->implementsInterface(UnionResolverInterface::class)
                             || $reflection->implementsInterface(InterfaceResolverInterface::class)) {
                             $resolvers[$graphqlName] = new Reference($serviceId);
                         } else {
