@@ -22,8 +22,20 @@ final class ConstraintViolationException extends RuntimeException implements Exc
     {
         $formatted = [];
         foreach ($this->constraintViolationList as $violation) {
+            $exploded = explode('.', $violation->getPropertyPath());
+
+            $path = [];
+            foreach ($exploded as $prop) {
+                if (preg_match('/(?<prop>\w+)\[(?<arrayKey>\d)+]/', $prop, $matches)) {
+                    $path[] = $matches['prop'];
+                    $path[] = (int)$matches['arrayKey'];
+                } else {
+                    $path[] = $prop;
+                }
+            }
+
             $formatted[] = [
-                'path' => explode('.', $violation->getPropertyPath()),
+                'path' => $path,
                 'message' => $violation->getMessage(),
             ];
         }
