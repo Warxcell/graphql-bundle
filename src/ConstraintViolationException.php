@@ -8,6 +8,8 @@ use GraphQL\Error\ClientAware;
 use RuntimeException;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
+use function explode;
+
 final class ConstraintViolationException extends RuntimeException implements Exception, ClientAware
 {
     public function __construct(
@@ -21,7 +23,7 @@ final class ConstraintViolationException extends RuntimeException implements Exc
         $formatted = [];
         foreach ($this->constraintViolationList as $violation) {
             $formatted[] = [
-                'path' => $violation->getPropertyPath(),
+                'path' => explode('.', $violation->getPropertyPath()),
                 'message' => $violation->getMessage(),
             ];
         }
