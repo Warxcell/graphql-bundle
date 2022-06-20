@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Arxy\GraphQL\Controller\GraphQL;
+use Arxy\GraphQL\DocumentNodeProvider;
+use Arxy\GraphQL\ErrorHandler;
 use Arxy\GraphQL\SchemaBuilder;
 use Arxy\GraphQL\Serializer\BackedEnumNormalizer;
 use GraphQL\Type\Schema;
@@ -15,8 +17,9 @@ return function (ContainerConfigurator $configurator) {
         ->autowire()
         ->autoconfigure();
 
-    $services->load('Arxy\\GraphQL\\', '../../*')
-        ->exclude('../../{Resources,DependencyInjection}');
+    $services->set(SchemaBuilder::class);
+    $services->set(DocumentNodeProvider::class);
+    $services->set(ErrorHandler::class);
 
     $services->set('arxy.graphql.executable_schema', Schema::class)
         ->factory([service(SchemaBuilder::class), 'makeExecutableSchema']);

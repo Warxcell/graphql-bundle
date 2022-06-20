@@ -9,8 +9,9 @@ use Arxy\GraphQL\ErrorHandlerInterface;
 use Arxy\GraphQL\Exception;
 use Closure;
 use GraphQL\Error\DebugFlag;
-use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
+use GraphQL\Executor\Promise\PromiseAdapter;
 use GraphQL\Language\AST\DocumentNode;
+use GraphQL\Server\Helper;
 use GraphQL\Server\OperationParams;
 use GraphQL\Server\ServerConfig;
 use GraphQL\Server\StandardServer;
@@ -32,19 +33,14 @@ final class GraphQL
 {
     private readonly Closure $handler;
 
-    /**
-     * @param Schema $schema
-     * @param SyncPromiseAdapter $promiseAdapter
-     * @param bool $debug
-     */
     public function __construct(
         ResponseFactoryInterface $responseFactory,
         StreamFactoryInterface $streamFactory,
         Schema $schema,
-        SyncPromiseAdapter $promiseAdapter,
+        PromiseAdapter $promiseAdapter,
         bool $debug,
+        ErrorHandlerInterface $errorsHandler,
         ?ContextFactoryInterface $contextFactory,
-        ?ErrorHandlerInterface $errorsHandler
     ) {
         $server = new StandardServer(
             ServerConfig::create()
@@ -69,25 +65,25 @@ final class GraphQL
                         $previous = $error->getPrevious();
                         if ($previous instanceof Exception) {
                             $formatted['extensions'] += $previous->getExtensions();
-                        };
+                            $formatted['extensions']['category'] = $previous->getCategory();
+                        }
 
                         return $formatted;
                     });
                 })
                 ->setDebugFlag($debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE)
                 ->setPromiseAdapter($promiseAdapter)
-                ->setPersistentQueryLoader(static function (string $queryId, OperationParams $operationParams) {
+                ->setPersistedQueryLoader(static function (string $queryId, OperationParams $operationParams) {
                     return $operationParams->query;
                 })
         );
-
+        $helper = new Helper();
         $this->handler = static function (ServerRequestInterface $request) use (
             $server,
             $responseFactory,
-            $streamFactory
+            $streamFactory,
+            $helper
         ) {
-            $helper = $server->getHelper();
-
             $parsedBody = $helper->parsePsrRequest($request);
 
             $result = $server->executeRequest($parsedBody);

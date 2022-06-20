@@ -7,6 +7,10 @@ namespace Arxy\GraphQL;
 use Attribute;
 
 #[Attribute(Attribute::TARGET_CLASS)]
-final class Enum
+final class Resolver
 {
+    public function __construct(
+        public readonly ?string $name = null
+    ) {
+    }
 }

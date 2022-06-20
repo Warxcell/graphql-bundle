@@ -1,16 +1,3 @@
-schema {
-    query: Query
-    mutation: Mutation
-}
-
 directive @specifiedBy(url: String!) on SCALAR
 
 directive @isGranted(role: String!) on FIELD_DEFINITION
-
-type Query {
-    ping: String!
-}
-
-type Mutation {
-    ping: String!
-}

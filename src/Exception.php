@@ -7,4 +7,6 @@ namespace Arxy\GraphQL;
 interface Exception
 {
     public function getExtensions(): array;
+
+    public function getCategory(): string;
 }

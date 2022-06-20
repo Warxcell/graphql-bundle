@@ -4,18 +4,12 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Codegen;
 
-use Arxy\GraphQL\Enum;
 use Arxy\GraphQL\InterfaceResolverInterface;
 use Arxy\GraphQL\ResolverInterface;
 use Arxy\GraphQL\ScalarResolverInterface;
 use Arxy\GraphQL\UnionResolverInterface;
-use Arxy\GraphQLCodegen\ModuleInterface;
-use Arxy\GraphQLCodegen\TypeDecoratorInterface;
-use GraphQL\Language\AST\EnumTypeDefinitionNode;
-use GraphQL\Language\AST\EnumTypeExtensionNode;
-use GraphQL\Language\AST\FieldDefinitionNode;
-use GraphQL\Language\AST\InputObjectTypeDefinitionNode;
-use GraphQL\Language\AST\InputObjectTypeExtensionNode;
+use Arxy\GraphQLCodegen\AbstractTypeDecorator;
+use Arxy\GraphQLCodegen\Module;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeExtensionNode;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
@@ -24,59 +18,22 @@ use GraphQL\Language\AST\ScalarTypeDefinitionNode;
 use GraphQL\Language\AST\ScalarTypeExtensionNode;
 use GraphQL\Language\AST\UnionTypeDefinitionNode;
 use GraphQL\Language\AST\UnionTypeExtensionNode;
-use Nette\PhpGenerator\ClassType;
-use Nette\PhpGenerator\EnumType;
 use Nette\PhpGenerator\InterfaceType;
 
-final class TypeDecorator implements TypeDecoratorInterface
+final class TypeDecorator extends AbstractTypeDecorator
 {
-    public function handleObject(
-        ModuleInterface $module,
-        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
-        ClassType $classLike
-    ): void {
-    }
-
-    public function handleObjectFieldArgs(
-        ModuleInterface $module,
-        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
-        FieldDefinitionNode $fieldNode,
-        ClassType $classLike
-    ): void {
-    }
-
     public function handleObjectResolverInterface(
-        ModuleInterface $module,
+        array $documents,
+        Module $module,
         ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
         InterfaceType $classLike
     ): void {
         $classLike->addExtend(ResolverInterface::class);
     }
 
-    public function handleObjectResolverImplementation(
-        ModuleInterface $module,
-        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
-        ClassType $classLike
-    ): void {
-    }
-
-    public function handleInputObjectType(
-        ModuleInterface $module,
-        InputObjectTypeExtensionNode|InputObjectTypeDefinitionNode $definitionNode,
-        ClassType $classLike
-    ): void {
-    }
-
-    public function handleEnumType(
-        ModuleInterface $module,
-        EnumTypeDefinitionNode|EnumTypeExtensionNode $enumNode,
-        EnumType $classLike
-    ): void {
-        $classLike->addAttribute(Enum::class);
-    }
-
     public function handleScalarResolverInterface(
-        ModuleInterface $module,
+        array $documents,
+        Module $module,
         ScalarTypeExtensionNode|ScalarTypeDefinitionNode $scalarNode,
         InterfaceType $classLike
     ): void {
@@ -84,7 +41,8 @@ final class TypeDecorator implements TypeDecoratorInterface
     }
 
     public function handleInterfaceResolverInterface(
-        ModuleInterface $module,
+        array $documents,
+        Module $module,
         InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $interfaceNode,
         InterfaceType $classLike
     ): void {
@@ -92,7 +50,8 @@ final class TypeDecorator implements TypeDecoratorInterface
     }
 
     public function handleUnionResolverInterface(
-        ModuleInterface $module,
+        array $documents,
+        Module $module,
         UnionTypeDefinitionNode|UnionTypeExtensionNode $unionNode,
         InterfaceType $classLike
     ): void {

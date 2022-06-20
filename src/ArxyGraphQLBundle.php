@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
+use Arxy\GraphQL\Debug\TimingMiddleware;
+use Closure;
 use LogicException;
-use ReflectionClass;
 use ReflectionMethod;
-use ReflectionObject;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
-use function assert;
-use function count;
-use function in_array;
+use function array_reverse;
+use function is_int;
 use function sprintf;
 use function str_replace;
 
@@ -27,35 +27,17 @@ final class ArxyGraphQLBundle extends Bundle
             new class implements CompilerPassInterface {
                 public function process(ContainerBuilder $container)
                 {
+                    $debug = $container->getParameter('kernel.debug');
+
                     $schemaBuilder = $container->getDefinition('arxy.graphql.executable_schema');
                     $resolvers = [];
-                    $argumentsMapping = [];
-                    $enums = [];
 
-                    // TODO: Better way
-                    $reflection = new ReflectionObject($container);
-                    $classReflectors = $reflection->getProperty('classReflectors');
-                    $classReflectors->setAccessible(true);
-                    $reflectors = $classReflectors->getValue($container);
-
-                    foreach ($reflectors as $reflector) {
-                        if (!$reflector) {
-                            continue;
-                        }
-                        assert($reflector instanceof ReflectionClass);
-                        if (in_array($reflector->getName(), [Query::class, Mutation::class])) {
-                            continue;
-                        }
-
-                        if (count($reflector->getAttributes(Enum::class)) > 0) {
-                            $enums[$reflector->getShortName()] = $reflector->getName();
-                        }
-                    }
+                    $resolversDebugInfo = [];
 
                     foreach ($container->findTaggedServiceIds('arxy.graphql.resolver') as $serviceId => $tags) {
                         $service = $container->getDefinition($serviceId);
 
-                        $reflection = new ReflectionClass($service->getClass());
+                        $reflection = $container->getReflectionClass($service->getClass());
 
                         $implements = $reflection->getInterfaces();
 
@@ -76,7 +58,7 @@ final class ArxyGraphQLBundle extends Bundle
                             );
                         }
 
-                        $graphqlName = str_replace('Resolver', '', $interface->getShortName());
+                        $graphqlName = $tags['name'] ?? str_replace('ResolverInterface', '', $interface->getShortName());
 
                         if ($reflection->implementsInterface(ScalarResolverInterface::class)) {
                             $resolvers[$graphqlName] = new Reference($serviceId);
@@ -87,10 +69,8 @@ final class ArxyGraphQLBundle extends Bundle
                             $methods = $interface->getMethods(ReflectionMethod::IS_PUBLIC);
 
                             foreach ($methods as $method) {
+                                $resolverInfo = [];
                                 $field = $method->getName();
-                                $params = $method->getParameters();
-
-                                assert(isset($params[1]), 'Missing args parameter');
 
                                 if (isset($resolvers[$graphqlName][$field])) {
                                     throw new LogicException(
@@ -98,14 +78,78 @@ final class ArxyGraphQLBundle extends Bundle
                                     );
                                 }
 
-                                $argumentsMapping[$graphqlName][$field] = $params[1]->getType()->getName();
-                                $resolvers[$graphqlName][$field] = new Reference($serviceId);
+                                $resolver = [new Reference($serviceId), $field];
+                                $resolverInfo[] = [$serviceId, $field];
+
+                                $actuallyWrapResolver = function ($resolver, $serviceId) use (
+                                    $container,
+                                    $graphqlName,
+                                    $field
+                                ) {
+                                    $middlewareDefId = sprintf('arxy.graphql.middleware.%s.%s.%s', $graphqlName, $field, $serviceId);
+                                    $middlewareDef = new Definition(
+                                        Closure::class,
+                                        [
+                                            '$next' => new Reference($serviceId),
+                                            '$original' => $resolver,
+                                        ]
+                                    );
+                                    $middlewareDef->setFactory([MiddlewareStack::class, 'wrap']);
+
+                                    $container->setDefinition($middlewareDefId, $middlewareDef);
+
+                                    return new Reference($middlewareDefId);
+                                };
+
+                                $wrapResolver = function ($middlewareId) use (
+                                    $container,
+                                    $graphqlName,
+                                    $field,
+                                    &$resolver,
+                                    $debug,
+                                    &$actuallyWrapResolver,
+                                    &$resolverInfo
+                                ): void {
+                                    $resolverInfo[] = $middlewareId;
+                                    $resolver = $actuallyWrapResolver($resolver, $middlewareId);
+                                };
+
+                                $middlewares = array_reverse($container->getParameter('arxy.graphql.middlewares'));
+
+                                if ($debug) {
+                                    $middlewares[] = TimingMiddleware::class;
+                                }
+
+                                foreach ($middlewares as $graphqlNameOrInt => $middlewareOrFields) {
+                                    if (is_int($graphqlNameOrInt)) {
+                                        $wrapResolver($middlewareOrFields);
+                                        continue;
+                                    }
+                                    if ($graphqlNameOrInt !== $graphqlName) {
+                                        continue;
+                                    }
+                                    foreach (array_reverse($middlewareOrFields) as $fieldOrInt => $middlewareOrField) {
+                                        if (is_int($fieldOrInt)) {
+                                            $wrapResolver($middlewareOrField);
+                                        } elseif ($fieldOrInt === $field) {
+                                            foreach (array_reverse($middlewareOrField) as $middleware) {
+                                                $wrapResolver($middleware);
+                                            }
+                                        }
+                                    }
+                                }
+                                $resolvers[$graphqlName][$field] = $resolver;
+
+                                $resolversDebugInfo[$graphqlName][$field] = array_reverse($resolverInfo);
                             }
                         }
                     }
-                    $schemaBuilder->setArgument('$argumentsMapping', $argumentsMapping);
                     $schemaBuilder->setArgument('$resolvers', $resolvers);
-                    $schemaBuilder->setArgument('$enums', $enums);
+
+                    if ($debug) {
+                        $debugResolvers = $container->getDefinition(Command\DebugResolversCommand::class);
+                        $debugResolvers->setArgument('$resolversInfo', $resolversDebugInfo);
+                    }
                 }
             }
         );

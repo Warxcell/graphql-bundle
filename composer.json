@@ -17,7 +17,8 @@
     },
     "require-dev": {
         "nette/php-generator": "^4.0",
-        "arxy/graphql-codegen": "dev-main"
+        "arxy/graphql-codegen": "dev-main",
+        "symfony/stopwatch": "^6.1"
     },
     "version": "1.0.0",
     "autoload": {
