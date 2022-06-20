@@ -8,7 +8,6 @@ use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\ErrorHandler;
 use Arxy\GraphQL\SchemaBuilder;
-use Arxy\GraphQL\Serializer\BackedEnumNormalizer;
 use GraphQL\Type\Schema;
 
 return function (ContainerConfigurator $configurator) {
@@ -27,8 +26,4 @@ return function (ContainerConfigurator $configurator) {
     $services->set(GraphQL::class)
         ->tag('controller.service_arguments')
         ->arg('$schema', service('arxy.graphql.executable_schema'));
-
-    $services->set(BackedEnumNormalizer::class)
-        ->decorate('serializer.normalizer.backed_enum')
-        ->args(['$decorated' => service('.inner')]);
 };

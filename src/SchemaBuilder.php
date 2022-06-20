@@ -24,7 +24,6 @@ use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
 use Symfony\Component\Security\Core\Security;
-use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
@@ -91,14 +90,12 @@ final class SchemaBuilder
         array $argumentsMapping,
         array $inputObjectsMapping,
         array $enumsMapping,
-        DenormalizerInterface $serializer,
         Security $security,
         ValidatorInterface $validator
     ): Schema {
         $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
             $argumentsMapping,
             $resolvers,
-            $serializer,
             $validator,
             $security
         ): mixed {
@@ -110,10 +107,7 @@ final class SchemaBuilder
 
             $class = $argumentsMapping[$info->parentType->name][$info->fieldName] ?? null;
             if ($class) {
-                // https://webonyx.github.io/graphql-php/type-definitions/inputs/#converting-input-object-array-to-value-object
-                // https://github.com/webonyx/graphql-php/issues/1178
-                //$args = new $class(...$args);
-                $args = $serializer->denormalize($args, $class);
+                $args = new $class(...$args);
                 $errors = $validator->validate($args);
                 if (count($errors) > 0) {
                     throw new ConstraintViolationException($errors);
