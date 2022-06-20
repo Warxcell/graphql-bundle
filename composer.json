@@ -4,7 +4,7 @@
     "license": "proprietary",
     "require": {
         "php": ">=8.1",
-        "webonyx/graphql-php": "~v14.11",
+        "webonyx/graphql-php": "dev-master",
         "symfony/psr-http-message-bridge": "^2.1",
         "symfony/dependency-injection": "^5.0 | ^6.0",
         "psr/http-factory": "^1.0",
