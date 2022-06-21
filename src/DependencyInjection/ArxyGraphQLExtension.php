@@ -31,19 +31,21 @@ final class ArxyGraphQLExtension extends Extension
      */
     public function load(array $configs, ContainerBuilder $container)
     {
+        $debug = $container->getParameter('kernel.debug');
+
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
         $loader->load('services.php');
-        if ($container->getParameter('kernel.debug')) {
+        if ($debug) {
             $loader->load('services_dev.php');
         }
 
         $schemas = $config['schema'];
         $schemas[] = __DIR__ . '/../Resources/graphql/schema.graphql';
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
-        $schemaBuilderDef->setArgument('$debug', $config['debug']);
+        $schemaBuilderDef->setArgument('$debug', $debug);
 
         $executableSchemaBuilderDef = $container->getDefinition('arxy.graphql.executable_schema');
         $executableSchemaBuilderDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
@@ -54,7 +56,7 @@ final class ArxyGraphQLExtension extends Extension
 
         $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
-        $controllerDef->setArgument('$debug', $config['debug']);
+        $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
 
@@ -67,7 +69,7 @@ final class ArxyGraphQLExtension extends Extension
         $documentNodeProvider->setArgument('$schemas', $schemas);
         $container->setAlias(DocumentNodeProviderInterface::class, DocumentNodeProvider::class);
 
-        if (!$config['debug']) {
+        if (!$debug) {
             $cachedDocumentNodeProvider = new Definition(CachedDocumentNodeProvider::class);
             $cachedDocumentNodeProvider->setArgument('$documentNodeProvider', new Reference('.inner'));
             $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'] . '/schema.php');
