@@ -24,7 +24,7 @@ final class ConstraintViolationException extends RuntimeException implements Exc
         foreach ($this->constraintViolationList as $violation) {
             $path = [];
 
-            if ($violation->getPropertyPath() === '') {
+            if ($violation->getPropertyPath() !== '') {
                 $exploded = explode('.', $violation->getPropertyPath());
 
                 foreach ($exploded as $prop) {
