@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-use GraphQL\Error\ClientAware;
 use RuntimeException;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 use function explode;
 
-final class ConstraintViolationException extends RuntimeException implements Exception, ClientAware
+final class ConstraintViolationException extends RuntimeException implements Exception
 {
     public function __construct(
         public readonly ConstraintViolationListInterface $constraintViolationList

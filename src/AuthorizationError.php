@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-use GraphQL\Error\ClientAware;
 use RuntimeException;
 
-final class AuthorizationError extends RuntimeException implements ClientAware
+final class AuthorizationError extends RuntimeException implements Exception
 {
     public function __construct(
         public readonly string $role
@@ -18,6 +17,11 @@ final class AuthorizationError extends RuntimeException implements ClientAware
     public function isClientSafe(): bool
     {
         return true;
+    }
+
+    public function getExtensions(): array
+    {
+        return [];
     }
 
     public function getCategory(): string

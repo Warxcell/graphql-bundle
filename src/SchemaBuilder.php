@@ -35,9 +35,6 @@ use function sprintf;
  */
 final class SchemaBuilder
 {
-    /**
-     * @param iterable<string> $schemas
-     */
     public function __construct(
         private readonly DocumentNodeProviderInterface $documentNodeProvider,
         private readonly bool $debug
@@ -174,7 +171,7 @@ final class SchemaBuilder
                 case InputObjectTypeDefinitionNode::class:
                     $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
                     if ($class) {
-                        $typeConfig['parseValue'] = static fn (array $values) => new $class(...$values);
+                        $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
                     }
                     break;
             }
