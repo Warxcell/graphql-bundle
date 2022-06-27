@@ -6,7 +6,7 @@ namespace Arxy\GraphQL;
 
 use RuntimeException;
 
-final class AuthorizationError extends RuntimeException implements Exception
+final class AuthorizationError extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly string $role

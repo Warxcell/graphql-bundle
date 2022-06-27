@@ -9,7 +9,7 @@ use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 use function explode;
 
-final class ConstraintViolationException extends RuntimeException implements Exception
+final class ConstraintViolationException extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
         public readonly ConstraintViolationListInterface $constraintViolationList

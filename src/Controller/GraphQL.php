@@ -6,7 +6,7 @@ namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\ErrorHandlerInterface;
-use Arxy\GraphQL\Exception;
+use Arxy\GraphQL\ExceptionInterface;
 use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Executor\Promise\PromiseAdapter;
@@ -63,7 +63,7 @@ final class GraphQL
                         $formatted = $formatter($error);
 
                         $previous = $error->getPrevious();
-                        if ($previous instanceof Exception) {
+                        if ($previous instanceof ExceptionInterface) {
                             $formatted['extensions'] += $previous->getExtensions();
                             $formatted['extensions']['category'] = $previous->getCategory();
                         }

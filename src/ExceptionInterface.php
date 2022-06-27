@@ -6,7 +6,7 @@ namespace Arxy\GraphQL;
 
 use GraphQL\Error\ClientAware;
 
-interface Exception extends ClientAware
+interface ExceptionInterface extends ClientAware
 {
     public function getExtensions(): array;
 
