@@ -41,10 +41,6 @@ final class SchemaBuilder
     ) {
     }
 
-    /**
-     * @throws SyntaxError
-     * @throws Error
-     */
     public function makeSchema(?Closure $typeConfigDecorator = null): Schema
     {
         $document = $this->documentNodeProvider->getDocumentNode();
@@ -164,12 +160,15 @@ final class SchemaBuilder
                 case EnumTypeDefinitionNode::class:
                     $enum = $enumsMapping[$name] ?? null;
                     assert($enum !== null, sprintf('Missing enum %s', $name));
+
                     foreach ($typeConfig['values'] as $key => &$value) {
                         $value['value'] = $enum::from($key);
                     }
                     break;
                 case InputObjectTypeDefinitionNode::class:
                     $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
+                    assert($class !== null, sprintf('Missing input %s', $name));
+
                     if ($class) {
                         $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
                     }

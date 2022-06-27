@@ -8,12 +8,9 @@ use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
-use Arxy\GraphQL\InterfaceResolverInterface;
 use Arxy\GraphQL\Resolver;
 use Arxy\GraphQL\ResolverInterface;
-use Arxy\GraphQL\ScalarResolverInterface;
 use Arxy\GraphQL\SchemaBuilder;
-use Arxy\GraphQL\UnionResolverInterface;
 use Exception;
 use ReflectionClass;
 use Symfony\Component\Config\FileLocator;
@@ -61,9 +58,6 @@ final class ArxyGraphQLExtension extends Extension
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
 
         $container->registerForAutoconfiguration(ResolverInterface::class)->addTag('arxy.graphql.resolver');
-        $container->registerForAutoconfiguration(ScalarResolverInterface::class)->addTag('arxy.graphql.resolver');
-        $container->registerForAutoconfiguration(InterfaceResolverInterface::class)->addTag('arxy.graphql.resolver');
-        $container->registerForAutoconfiguration(UnionResolverInterface::class)->addTag('arxy.graphql.resolver');
 
         $documentNodeProvider = $container->getDefinition(DocumentNodeProvider::class);
         $documentNodeProvider->setArgument('$schemas', $schemas);

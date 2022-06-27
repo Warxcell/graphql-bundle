@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Codegen;
 
-use Arxy\GraphQL\InterfaceResolverInterface;
 use Arxy\GraphQL\ResolverInterface;
-use Arxy\GraphQL\ScalarResolverInterface;
-use Arxy\GraphQL\UnionResolverInterface;
 use Arxy\GraphQLCodegen\AbstractTypeDecorator;
 use Arxy\GraphQLCodegen\Module;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
@@ -25,7 +22,7 @@ final class TypeDecorator extends AbstractTypeDecorator
     public function handleObjectResolverInterface(
         array $documents,
         Module $module,
-        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $objectNode,
+        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $definitionNode,
         InterfaceType $classLike
     ): void {
         $classLike->addExtend(ResolverInterface::class);
@@ -34,27 +31,27 @@ final class TypeDecorator extends AbstractTypeDecorator
     public function handleScalarResolverInterface(
         array $documents,
         Module $module,
-        ScalarTypeExtensionNode|ScalarTypeDefinitionNode $scalarNode,
+        ScalarTypeExtensionNode|ScalarTypeDefinitionNode $definitionNode,
         InterfaceType $classLike
     ): void {
-        $classLike->addExtend(ScalarResolverInterface::class);
+        $classLike->addExtend(ResolverInterface::class);
     }
 
     public function handleInterfaceResolverInterface(
         array $documents,
         Module $module,
-        InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $interfaceNode,
+        InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $definitionNode,
         InterfaceType $classLike
     ): void {
-        $classLike->addExtend(InterfaceResolverInterface::class);
+        $classLike->addExtend(ResolverInterface::class);
     }
 
     public function handleUnionResolverInterface(
         array $documents,
         Module $module,
-        UnionTypeDefinitionNode|UnionTypeExtensionNode $unionNode,
+        UnionTypeDefinitionNode|UnionTypeExtensionNode $definitionNode,
         InterfaceType $classLike
     ): void {
-        $classLike->addExtend(UnionResolverInterface::class);
+        $classLike->addExtend(ResolverInterface::class);
     }
 }

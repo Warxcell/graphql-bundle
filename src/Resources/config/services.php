@@ -6,6 +6,7 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
+use Arxy\GraphQL\DocumentNodeProviderInterface;
 use Arxy\GraphQL\ErrorHandler;
 use Arxy\GraphQL\SchemaBuilder;
 use GraphQL\Type\Schema;
@@ -16,7 +17,9 @@ return function (ContainerConfigurator $configurator) {
         ->autowire()
         ->autoconfigure();
 
-    $services->set(SchemaBuilder::class);
+    $services->set(SchemaBuilder::class)->args([
+        '$documentNodeProvider' => service(DocumentNodeProviderInterface::class),
+    ]);
     $services->set(DocumentNodeProvider::class);
     $services->set(ErrorHandler::class);
 
