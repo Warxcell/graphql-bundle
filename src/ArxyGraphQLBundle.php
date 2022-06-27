@@ -20,6 +20,7 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 use function array_reverse;
+use function count;
 use function in_array;
 use function is_int;
 use function sprintf;
@@ -159,6 +160,7 @@ final class ArxyGraphQLBundle extends Bundle
                     }
                     $executableSchemaBuilderDefinition->setArgument('$resolvers', $resolvers);
 
+                    $missingResolvers = [];
                     foreach ($schema->getTypeMap() as $type) {
                         if (in_array($type, Type::getAllBuiltInTypes())) {
                             // standard types have built-in resolvers.
@@ -170,17 +172,21 @@ final class ArxyGraphQLBundle extends Bundle
                             case $type instanceof UnionType:
                             case $type instanceof InterfaceType:
                                 if (!isset($resolvers[$type->name])) {
-                                    throw new LogicException(sprintf('Missing resolvers for %s', $type->name));
+                                    $missingResolvers[] = sprintf('%s', $type->name);
                                 }
                                 break;
                             case $type instanceof ObjectType:
                                 foreach ($type->getFieldNames() as $field) {
                                     if (!isset($resolvers[$type->name][$field])) {
-                                        throw new LogicException(sprintf('Missing resolvers for %s.%s', $type->name, $field));
+                                        $missingResolvers[] = sprintf('%s.%s', $type->name, $field);
                                     }
                                 }
                                 break;
                         }
+                    }
+
+                    if (count($missingResolvers) > 0) {
+                        throw new LogicException(sprintf('Missing resolvers: %s', implode(', ', $missingResolvers)));
                     }
 
                     if ($debug) {
