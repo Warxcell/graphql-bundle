@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\CachedDocumentNodeProvider;
-use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
+use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\Resolver;
 use Arxy\GraphQL\ResolverInterface;
 use Arxy\GraphQL\SchemaBuilder;
@@ -51,7 +51,7 @@ final class ArxyGraphQLExtension extends Extension
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
-        $controllerDef = $container->getDefinition(GraphQL::class);
+        $controllerDef = $container->getDefinition(RequestHandler::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
