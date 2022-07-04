@@ -59,8 +59,7 @@ final class RequestHandler implements RequestHandlerInterface
 
                         $previous = $error->getPrevious();
                         if ($previous instanceof ExceptionInterface) {
-                            $formatted['extensions'] += $previous->getExtensions();
-                            $formatted['extensions']['category'] = $previous->getCategory();
+                            $formatted['extensions'] = ($formatted['extensions'] ?? []) + ['category' => $previous->getCategory()];
                         }
 
                         return $formatted;
