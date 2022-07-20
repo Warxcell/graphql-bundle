@@ -154,7 +154,7 @@ final class ArxyGraphQLBundle extends Bundle
                                     }
                                     break;
                                 default:
-                                    throw new LogicException(sprintf('Type %s not supported', $type::class));
+                                    throw new LogicException(sprintf('Type %s not supported', $graphqlName));
                             }
                         }
                     }
