@@ -8,6 +8,7 @@ use RuntimeException;
 use Symfony\Component\Validator\ConstraintViolationListInterface;
 
 use function explode;
+use function preg_match;
 
 final class ConstraintViolationException extends RuntimeException implements ExceptionInterface
 {
