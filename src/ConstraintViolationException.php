@@ -40,6 +40,7 @@ final class ConstraintViolationException extends RuntimeException implements Exc
             $formatted[] = [
                 'path' => $path,
                 'message' => $violation->getMessage(),
+                'code' => $violation->getCode(),
             ];
         }
 
