@@ -74,7 +74,7 @@ final class SchemaBuilder
     }
 
     /**
-     * @param array<string, array<string, object>> $resolvers
+     * @param array<string, array<string, callable>> $resolvers
      * @throws Error
      * @throws SyntaxError
      */
