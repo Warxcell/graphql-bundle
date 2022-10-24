@@ -23,11 +23,8 @@ use GraphQL\Type\Schema;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
-use Symfony\Component\Security\Core\Security;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
-use function count;
 use function sprintf;
 
 /**
@@ -83,32 +80,20 @@ final class SchemaBuilder
         array $argumentsMapping,
         array $inputObjectsMapping,
         array $enumsMapping,
-        Security $security,
-        ValidatorInterface $validator
     ): Schema {
         $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
             $argumentsMapping,
-            $resolvers,
-            $validator,
-            $security
+            $resolvers
         ): mixed {
-            $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
+            $class = $argumentsMapping[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
+                sprintf('Could not find arguments mapping for %s.%s', $info->parentType->name, $info->fieldName)
+            );
 
-            if ($isGrantedDirective && !$security->isGranted($isGrantedDirective['role'])) {
-                throw new AuthorizationError($isGrantedDirective['role']);
-            }
+            $args = new $class(...$args);
 
-            $class = $argumentsMapping[$info->parentType->name][$info->fieldName] ?? null;
-            if ($class) {
-                $args = new $class(...$args);
-                $errors = $validator->validate($args);
-                if (count($errors) > 0) {
-                    throw new ConstraintViolationException($errors);
-                }
-            }
             $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
-                    sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
-                );
+                sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
+            );
 
             return $objectResolver($objectValue, $args, $contextValue, $info);
         };
