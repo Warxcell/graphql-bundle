@@ -8,7 +8,6 @@ use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Executor\Promise\PromiseAdapter;
-use GraphQL\Language\Parser;
 use GraphQL\Server\Helper;
 use GraphQL\Server\OperationParams;
 use GraphQL\Server\RequestError;
@@ -71,11 +70,6 @@ final class RequestHandler implements RequestHandlerInterface
     {
         $parsedBody = $this->helper->parsePsrRequest($request);
         $response = $this->responseFactory->createResponse();
-
-        if ($parsedBody->query !== null) {
-            $parsedBody->query = Parser::parse($parsedBody->query);
-        }
-
         $operationAST = AST::getOperationAST($parsedBody->query, $parsedBody->operation);
 
         if ($operationAST === null) {
