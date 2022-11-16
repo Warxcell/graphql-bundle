@@ -162,7 +162,7 @@ final class ArxyGraphQLBundle extends Bundle
 
                     $missingResolvers = [];
                     foreach ($schema->getTypeMap() as $type) {
-                        if (in_array($type, Type::getAllBuiltInTypes())) {
+                        if (in_array($type, Type::getStandardTypes())) {
                             // standard types have built-in resolvers.
                             continue;
                         }
