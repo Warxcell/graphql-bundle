@@ -23,6 +23,7 @@ use function array_reverse;
 use function count;
 use function in_array;
 use function is_int;
+use function method_exists;
 use function sprintf;
 use function str_replace;
 
@@ -162,7 +163,9 @@ final class ArxyGraphQLBundle extends Bundle
 
                     $missingResolvers = [];
                     foreach ($schema->getTypeMap() as $type) {
-                        if (in_array($type, Type::getStandardTypes())) {
+                        // Version Compatibility between 14 / 15.
+                        $types = method_exists(Type::class, 'getAllBuiltInTypes') ? Type::getAllBuiltInTypes() : Type::builtInTypes();
+                        if (in_array($type, $types)) {
                             // standard types have built-in resolvers.
                             continue;
                         }
