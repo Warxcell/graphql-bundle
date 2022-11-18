@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Reference;
 use Symfony\Component\HttpKernel\Bundle\Bundle;
+use Throwable;
 
 use function array_reverse;
 use function count;
@@ -71,8 +72,21 @@ final class ArxyGraphQLBundle extends Bundle
                             switch (true) {
                                 case $type instanceof EnumType:
                                     $definition = $container->getDefinition($serviceId);
+                                    $class = $definition->getClass();
 
-                                    $resolvers[$graphqlName] = $definition->getClass();
+                                    foreach ($type->getValues() as $value) {
+                                        try {
+                                            [$class, 'resolve']($value->name);
+                                        } catch (Throwable $throwable) {
+                                            throw new LogicException(
+                                                sprintf('Wrong value for enum %s.%s', $graphqlName, $value->name),
+                                                0,
+                                                $throwable
+                                            );
+                                        }
+                                    }
+
+                                    $resolvers[$graphqlName] = $class;
                                     break;
                                 case $type instanceof ScalarType:
                                 case $type instanceof UnionType:
