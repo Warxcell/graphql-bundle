@@ -7,6 +7,8 @@ namespace Arxy\GraphQL\Codegen;
 use Arxy\GraphQL\ResolverInterface;
 use Arxy\GraphQLCodegen\AbstractTypeDecorator;
 use Arxy\GraphQLCodegen\Module;
+use GraphQL\Language\AST\EnumTypeDefinitionNode;
+use GraphQL\Language\AST\EnumTypeExtensionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeExtensionNode;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
@@ -50,6 +52,15 @@ final class TypeDecorator extends AbstractTypeDecorator
         array $documents,
         Module $module,
         UnionTypeDefinitionNode|UnionTypeExtensionNode $definitionNode,
+        InterfaceType $classLike
+    ): void {
+        $classLike->addExtend(ResolverInterface::class);
+    }
+
+    public function handleEnumResolverInterface(
+        array $documents,
+        Module $module,
+        EnumTypeDefinitionNode|EnumTypeExtensionNode $definitionNode,
         InterfaceType $classLike
     ): void {
         $classLike->addExtend(ResolverInterface::class);

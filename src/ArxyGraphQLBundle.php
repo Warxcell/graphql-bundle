@@ -6,6 +6,7 @@ namespace Arxy\GraphQL;
 
 use Arxy\GraphQL\Debug\TimingMiddleware;
 use Closure;
+use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\ScalarType;
@@ -21,6 +22,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 
 use function array_reverse;
 use function count;
+use function implode;
 use function in_array;
 use function is_int;
 use function method_exists;
@@ -67,6 +69,11 @@ final class ArxyGraphQLBundle extends Bundle
                             $type = $schema->getType($graphqlName);
 
                             switch (true) {
+                                case $type instanceof EnumType:
+                                    $definition = $container->getDefinition($serviceId);
+
+                                    $resolvers[$graphqlName] = $definition->getClass();
+                                    break;
                                 case $type instanceof ScalarType:
                                 case $type instanceof UnionType:
                                 case $type instanceof InterfaceType:

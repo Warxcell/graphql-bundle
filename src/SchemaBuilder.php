@@ -28,7 +28,6 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
 use function count;
-use function mb_strtoupper;
 use function sprintf;
 
 /**
@@ -163,7 +162,12 @@ final class SchemaBuilder
                     assert($enum !== null, sprintf('Missing enum %s', $name));
 
                     foreach ($typeConfig['values'] as $key => &$value) {
-                        $value['value'] = $enum::from(mb_strtoupper($key));
+                        if (isset($resolvers[$name])) {
+                            $enumValue = [$resolvers[$name], 'resolve']($key);
+                        } else {
+                            $enumValue = $enum::from($key);
+                        }
+                        $value['value'] = $enumValue;
                     }
                     break;
                 case InputObjectTypeDefinitionNode::class:
