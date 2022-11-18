@@ -13,7 +13,10 @@ use GraphQL\Type\Definition\ScalarType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\UnionType;
 use LogicException;
+use ReflectionEnum;
+use ReflectionException;
 use ReflectionMethod;
+use SplObjectStorage;
 use Symfony\Component\DependencyInjection\Compiler\CompilerPassInterface;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -44,6 +47,7 @@ final class ArxyGraphQLBundle extends Bundle
                     $debug = $container->getParameter('kernel.debug');
 
                     $executableSchemaBuilderDefinition = $container->getDefinition('arxy.graphql.executable_schema');
+                    $enumsMapping = $executableSchemaBuilderDefinition->getArgument('$enumsMapping');
                     $resolvers = [];
 
                     $resolversDebugInfo = [];
@@ -74,16 +78,46 @@ final class ArxyGraphQLBundle extends Bundle
                                     $definition = $container->getDefinition($serviceId);
                                     $class = $definition->getClass();
 
+                                    if ($class === null) {
+                                        throw new LogicException(sprintf('Resolver for %s is missing', $graphqlName));
+                                    }
+
+                                    $values = new SplObjectStorage();
                                     foreach ($type->getValues() as $value) {
                                         try {
-                                            [$class, 'resolve']($value->name);
+                                            $values->offsetSet([$class, 'resolve']($value->name), $value);
                                         } catch (Throwable $throwable) {
                                             throw new LogicException(
-                                                sprintf('Wrong value for enum %s.%s', $graphqlName, $value->name),
+                                                sprintf('Could not resolve enum %s.%s', $graphqlName, $value->name),
                                                 0,
                                                 $throwable
                                             );
                                         }
+                                    }
+
+                                    try {
+                                        $enumRefl = new ReflectionEnum($enumsMapping[$graphqlName]);
+                                    } catch (ReflectionException $reflectionException) {
+                                        throw new LogicException(
+                                            sprintf('%s mapped to non-enum', $graphqlName),
+                                            0,
+                                            $reflectionException
+                                        );
+                                    }
+
+                                    if (!$enumRefl->isBacked()) {
+                                        throw new LogicException(
+                                            sprintf('%s mapped to non-backed enum', $graphqlName)
+                                        );
+                                    }
+
+                                    foreach ($enumRefl->getCases() as $case) {
+                                        if ($values->offsetExists($case->getValue())) {
+                                            continue;
+                                        }
+                                        throw new LogicException(
+                                            sprintf('%s:%s not found in %s', $enumRefl->getName(), $case->name, $graphqlName),
+                                        );
                                     }
 
                                     $resolvers[$graphqlName] = $class;
