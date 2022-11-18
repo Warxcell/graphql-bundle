@@ -28,6 +28,7 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
 use function count;
+use function mb_strtoupper;
 use function sprintf;
 
 /**
@@ -107,8 +108,8 @@ final class SchemaBuilder
                 }
             }
             $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
-                    sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
-                );
+                sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
+            );
 
             return $objectResolver($objectValue, $args, $contextValue, $info);
         };
@@ -162,7 +163,7 @@ final class SchemaBuilder
                     assert($enum !== null, sprintf('Missing enum %s', $name));
 
                     foreach ($typeConfig['values'] as $key => &$value) {
-                        $value['value'] = $enum::from($key);
+                        $value['value'] = $enum::from(mb_strtoupper($key));
                     }
                     break;
                 case InputObjectTypeDefinitionNode::class:
