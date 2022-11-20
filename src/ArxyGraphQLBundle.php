@@ -76,6 +76,12 @@ final class ArxyGraphQLBundle extends Bundle
 
                             switch (true) {
                                 case $type instanceof EnumType:
+                                    if (isset($resolvers[$graphqlName])) {
+                                        throw new LogicException(
+                                            sprintf('Multiple resolvers exists for %s', $graphqlName)
+                                        );
+                                    }
+
                                     $definition = $container->getDefinition($serviceId);
                                     $class = $definition->getClass();
 
@@ -127,6 +133,11 @@ final class ArxyGraphQLBundle extends Bundle
                                 case $type instanceof ScalarType:
                                 case $type instanceof UnionType:
                                 case $type instanceof InterfaceType:
+                                    if (isset($resolvers[$graphqlName])) {
+                                        throw new LogicException(
+                                            sprintf('Multiple resolvers exists for %s', $graphqlName)
+                                        );
+                                    }
                                     $resolvers[$graphqlName] = new Reference($serviceId);
                                     break;
                                 case $type instanceof ObjectType:
