@@ -171,10 +171,13 @@ final class SchemaBuilder
                     }
                     break;
                 case InputObjectTypeDefinitionNode::class:
-                    $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
-                    assert($class !== null, sprintf('Missing input %s', $name));
+                    if ($typeResolvers) {
+                        $resolverCallable = [$typeResolvers, 'resolve'];
+                        $typeConfig['parseValue'] = static fn (array $values): mixed => $resolverCallable(...$values);
+                    } else {
+                        $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
+                        assert($class !== null, sprintf('Missing input %s', $name));
 
-                    if ($class) {
                         $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
                     }
                     break;

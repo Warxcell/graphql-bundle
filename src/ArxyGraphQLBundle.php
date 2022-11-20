@@ -7,6 +7,7 @@ namespace Arxy\GraphQL;
 use Arxy\GraphQL\Debug\TimingMiddleware;
 use Closure;
 use GraphQL\Type\Definition\EnumType;
+use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\ScalarType;
@@ -122,6 +123,7 @@ final class ArxyGraphQLBundle extends Bundle
 
                                     $resolvers[$graphqlName] = $class;
                                     break;
+                                case $type instanceof InputObjectType:
                                 case $type instanceof ScalarType:
                                 case $type instanceof UnionType:
                                 case $type instanceof InterfaceType:

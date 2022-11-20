@@ -9,6 +9,8 @@ use Arxy\GraphQLCodegen\AbstractTypeDecorator;
 use Arxy\GraphQLCodegen\Module;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
 use GraphQL\Language\AST\EnumTypeExtensionNode;
+use GraphQL\Language\AST\InputObjectTypeDefinitionNode;
+use GraphQL\Language\AST\InputObjectTypeExtensionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeExtensionNode;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
@@ -61,6 +63,15 @@ final class TypeDecorator extends AbstractTypeDecorator
         array $documents,
         Module $module,
         EnumTypeDefinitionNode|EnumTypeExtensionNode $definitionNode,
+        InterfaceType $classLike
+    ): void {
+        $classLike->addExtend(ResolverInterface::class);
+    }
+
+    public function handleInputObjectResolverInterface(
+        array $documents,
+        Module $module,
+        InputObjectTypeExtensionNode|InputObjectTypeDefinitionNode $definitionNode,
         InterfaceType $classLike
     ): void {
         $classLike->addExtend(ResolverInterface::class);
