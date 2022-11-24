@@ -34,6 +34,8 @@ use function method_exists;
 use function sprintf;
 use function str_replace;
 
+use const PHP_EOL;
+
 final class ArxyGraphQLBundle extends Bundle
 {
     public function build(ContainerBuilder $container)
@@ -52,6 +54,8 @@ final class ArxyGraphQLBundle extends Bundle
                     $resolvers = [];
 
                     $resolversDebugInfo = [];
+
+                    $uncheckedEnums = $enumsMapping;
 
                     foreach ($container->findTaggedServiceIds('arxy.graphql.resolver') as $serviceId => $tags) {
                         $service = $container->getDefinition($serviceId);
@@ -128,6 +132,8 @@ final class ArxyGraphQLBundle extends Bundle
                                     }
 
                                     $resolvers[$graphqlName] = $class;
+
+                                    unset($uncheckedEnums[$graphqlName]);
                                     break;
                                 case $type instanceof InputObjectType:
                                 case $type instanceof ScalarType:
@@ -239,6 +245,36 @@ final class ArxyGraphQLBundle extends Bundle
                         }
 
                         switch (true) {
+                            case $type instanceof EnumType:
+                                if (!isset($uncheckedEnums[$type->name])) {
+                                    break;
+                                }
+                                $phpEnum = $uncheckedEnums[$type->name];
+
+                                $values = new SplObjectStorage();
+
+                                foreach ($type->getValues() as $value) {
+                                    try {
+                                        $values->offsetSet($phpEnum::from($value->name), $value);
+                                    } catch (Throwable $throwable) {
+                                        throw new LogicException(
+                                            sprintf('Could not resolve enum %s.%s', $type->name, $value->name),
+                                            0,
+                                            $throwable
+                                        );
+                                    }
+                                }
+
+                                foreach ($phpEnum::cases() as $case) {
+                                    if ($values->offsetExists($case)) {
+                                        continue;
+                                    }
+                                    throw new LogicException(
+                                        sprintf('%s:%s not found in %s', $phpEnum, $case->name, $type->name),
+                                    );
+                                }
+
+                                break;
                             case $type instanceof ScalarType:
                             case $type instanceof UnionType:
                             case $type instanceof InterfaceType:
