@@ -9,9 +9,9 @@ use RuntimeException;
 final class AuthorizationError extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
-        public readonly string $role
+        $message = 'You are not authorized!'
     ) {
-        parent::__construct('You are not authorized!');
+        parent::__construct($message);
     }
 
     public function isClientSafe(): bool
@@ -26,6 +26,6 @@ final class AuthorizationError extends RuntimeException implements ExceptionInte
 
     public function getCategory(): string
     {
-        return 'user';
+        return 'authorization';
     }
 }
