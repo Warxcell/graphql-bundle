@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
+use GraphQL\Error\Error;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Promise;
 use GraphQL\Server\OperationParams;
@@ -16,6 +17,7 @@ use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Throwable;
 
 use function explode;
 use function is_array;
@@ -43,6 +45,24 @@ final class GraphQL
         HttpFoundationFactoryInterface $psrToSymfony,
         PsrHttpFactory $symfonyToPsr,
     ): Promise|Response {
+        try {
+            $params = $this->parseRequest($request);
+            $result = $this->server->executeRequest($params);
+        } catch (Throwable $throwable) {
+            $result = new ExecutionResult(null, [
+                Error::createLocatedError($throwable),
+            ]);
+        }
+
+        if ($result instanceof Promise) {
+            return $result->then([$this, 'resultToResponse']);
+        }
+
+        return $this->resultToResponse($result);
+    }
+
+    private function parseRequest(Request $request): OperationParams
+    {
         if ($request->getMethod() === 'GET') {
             $bodyParams = [];
         } else {
@@ -78,19 +98,11 @@ final class GraphQL
             }
         }
 
-        $params = $this->parseRequestParams(
+        return $this->parseRequestParams(
             $request->getMethod(),
             $bodyParams,
             $request->query->all()
         );
-
-        $result = $this->server->executeRequest($params);
-
-        if ($result instanceof Promise) {
-            return $result->then([$this, 'resultToResponse']);
-        }
-
-        return $this->resultToResponse($result);
     }
 
     /**
