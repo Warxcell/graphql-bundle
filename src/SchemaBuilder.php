@@ -95,7 +95,7 @@ final class SchemaBuilder
             $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
 
             if ($isGrantedDirective && !$security->isGranted($isGrantedDirective['role'])) {
-                throw new AuthorizationError($isGrantedDirective['role']);
+                throw new AuthorizationError();
             }
 
             $class = $argumentsMapping[$info->parentType->name][$info->fieldName] ?? null;
