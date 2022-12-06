@@ -12,6 +12,7 @@ use GraphQL\Server\RequestError;
 use GraphQL\Server\StandardServer;
 use GraphQL\Utils\Utils;
 use JsonException;
+use LogicException;
 use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
 use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\InputBag;
@@ -44,7 +45,7 @@ final class GraphQL
         Request $request,
         HttpFoundationFactoryInterface $psrToSymfony,
         PsrHttpFactory $symfonyToPsr,
-    ): Promise|Response {
+    ): Response {
         try {
             $params = $this->parseRequest($request);
             $result = $this->server->executeRequest($params);
@@ -55,7 +56,7 @@ final class GraphQL
         }
 
         if ($result instanceof Promise) {
-            return $result->then([$this, 'resultToResponse']);
+            throw new LogicException('Promise not supported');
         }
 
         return $this->resultToResponse($result);
