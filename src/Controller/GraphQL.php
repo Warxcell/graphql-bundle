@@ -11,10 +11,6 @@ use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-use function json_decode;
-
-use const JSON_THROW_ON_ERROR;
-
 final class GraphQL
 {
     public function __construct(
@@ -31,12 +27,6 @@ final class GraphQL
         PsrHttpFactory $symfonyToPsr,
     ): Response {
         $psrRequest = $symfonyToPsr->createRequest($request);
-
-        if ($psrRequest->getHeader('Content-Type')[0] === 'application/json') {
-            $psrRequest = $psrRequest->withParsedBody(
-                json_decode($psrRequest->getBody()->getContents(), true, JSON_THROW_ON_ERROR)
-            );
-        }
 
         return $psrToSymfony->createResponse($this->handler->handle($psrRequest));
     }
