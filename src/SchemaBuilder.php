@@ -60,14 +60,14 @@ final class SchemaBuilder
             'assumeValidSDL' => !$this->debug,
         ];
         $schema = BuildSchema::build(
-            new DocumentNode(['definitions' => NodeList::create($nonExtendDefs)]),
+            new DocumentNode(['definitions' => new NodeList($nonExtendDefs)]),
             $typeConfigDecorator,
             $options
         );
 
         return SchemaExtender::extend(
             $schema,
-            new DocumentNode(['definitions' => NodeList::create($extendDefs)]),
+            new DocumentNode(['definitions' => new NodeList($extendDefs)]),
             $options,
             $typeConfigDecorator
         );
