@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\CachedDocumentNodeProvider;
+use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
 use Arxy\GraphQL\Resolver;
@@ -56,6 +57,10 @@ final class ArxyGraphQLExtension extends Extension
         $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
+
+        $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
+        $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);
+
 
         $container->registerForAutoconfiguration(ResolverInterface::class)->addTag('arxy.graphql.resolver');
 

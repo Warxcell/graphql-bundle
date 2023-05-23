@@ -25,7 +25,7 @@ class DebugResolversCommand extends Command
         parent::__construct();
     }
 
-    protected function configure()
+    protected function configure(): void
     {
         $this->addOption('object', 'o', InputOption::VALUE_REQUIRED);
     }

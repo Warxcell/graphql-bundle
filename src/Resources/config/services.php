@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
+use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
@@ -28,6 +29,8 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set('arxy.graphql.executable_schema', Schema::class)
         ->factory([service(SchemaBuilder::class), 'makeExecutableSchema']);
+
+    $services->set(DumpSchemaCommand::class);
 
     $services->set(RequestHandler::class);
     $services->set(StandardServer::class)

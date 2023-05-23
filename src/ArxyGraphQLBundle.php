@@ -34,15 +34,13 @@ use function method_exists;
 use function sprintf;
 use function str_replace;
 
-use const PHP_EOL;
-
 final class ArxyGraphQLBundle extends Bundle
 {
-    public function build(ContainerBuilder $container)
+    public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(
             new class implements CompilerPassInterface {
-                public function process(ContainerBuilder $container)
+                public function process(ContainerBuilder $container): void
                 {
                     $schemaBuilder = $container->get(SchemaBuilder::class);
                     $schema = $schemaBuilder->makeSchema();
