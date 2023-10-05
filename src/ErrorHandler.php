@@ -8,14 +8,15 @@ use Closure;
 use GraphQL\Error\ClientAware;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
-
 use function sprintf;
 
 final class ErrorHandler implements ErrorHandlerInterface
 {
     public function __construct(
-        private readonly LoggerInterface $logger
-    ) {
+        private readonly LoggerInterface $logger,
+        private readonly string $logLevel = LogLevel::ERROR
+    )
+    {
     }
 
     public function handleErrors(array $errors, Closure $formatter): array
@@ -33,7 +34,7 @@ final class ErrorHandler implements ErrorHandlerInterface
                     $error->getLine()
                 );
 
-                $this->logger->log(LogLevel::ERROR, $message, ['exception' => $error]);
+                $this->logger->log($this->logLevel, $message, ['exception' => $error]);
             }
 
             $formatted[] = $formatter($error);
