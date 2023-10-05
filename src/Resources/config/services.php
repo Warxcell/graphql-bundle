@@ -30,7 +30,7 @@ return function (ContainerConfigurator $configurator) {
     ]);
     $services->set(DocumentNodeProvider::class);
     $services->set(ErrorHandler::class)
-        ->arg('$logLevel', env('arxy.graphql.error_handler.log_level'));
+        ->arg('$logLevel', param('arxy.graphql.error_handler.log_level'));
 
     $services->set('arxy.graphql.executable_schema', Schema::class)
         ->factory([service(SchemaBuilder::class), 'makeExecutableSchema']);
