@@ -12,7 +12,8 @@ final class CacheWarmer implements CacheWarmerInterface
 {
     public function __construct(
         private readonly SchemaBuilder $schemaBuilder
-    ) {
+    )
+    {
     }
 
     public function isOptional(): bool
@@ -24,7 +25,7 @@ final class CacheWarmer implements CacheWarmerInterface
      * @throws SyntaxError
      * @throws Error
      */
-    public function warmUp(string $cacheDir)
+    public function warmUp(string $cacheDir): void
     {
         $schema = $this->schemaBuilder->makeSchema();
         $schema->assertValid();
