@@ -8,6 +8,7 @@ use Closure;
 use GraphQL\Error\ClientAware;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
+
 use function sprintf;
 
 final class ErrorHandler implements ErrorHandlerInterface
@@ -15,18 +16,16 @@ final class ErrorHandler implements ErrorHandlerInterface
     public function __construct(
         private readonly LoggerInterface $logger,
         private readonly string $logLevel = LogLevel::ERROR
-    )
-    {
+    ) {
     }
 
     public function handleErrors(array $errors, Closure $formatter): array
     {
         $formatted = [];
         foreach ($errors as $error) {
-            $previous = $error->getPrevious();
-            if (!$previous instanceof ClientAware || !$previous->isClientSafe()) {
+            if (!($error instanceof ClientAware && $error->isClientSafe())) {
                 $message = sprintf(
-                    '[GraphQL] %s: %s[%d] (caught throwable) at %s line %s.',
+                    '[GraphQL] "%s": "%s"[%d] at "%s" line "%s".',
                     $error::class,
                     $error->getMessage(),
                     $error->getCode(),

@@ -11,7 +11,7 @@ interface ErrorHandlerInterface
 {
     /**
      * @param list<Throwable> $errors
-     * @param Closure(Throwable):array $formatter
+     * @param Closure(Throwable): string[] $formatter
      */
     public function handleErrors(array $errors, Closure $formatter): array;
 }

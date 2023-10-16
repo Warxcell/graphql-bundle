@@ -19,12 +19,18 @@
     "require-dev": {
         "nette/php-generator": "^4.0",
         "arxy/graphql-codegen": "dev-main",
-        "symfony/stopwatch": "^6.1"
+        "symfony/stopwatch": "^6.1",
+        "phpunit/phpunit": "^10.4"
     },
     "version": "1.0.0",
     "autoload": {
         "psr-4": {
             "Arxy\\GraphQL\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Arxy\\GraphQL\\Tests\\": "tests/"
         }
     }
 }
