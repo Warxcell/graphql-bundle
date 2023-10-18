@@ -9,7 +9,7 @@ use RuntimeException;
 final class AuthorizationError extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
-        $message = 'You are not authorized!'
+        string $message = 'You are not authorized!'
     ) {
         parent::__construct($message);
     }
@@ -19,7 +19,7 @@ final class AuthorizationError extends RuntimeException implements ExceptionInte
         return true;
     }
 
-    public function getExtensions(): array
+    public function getExtensions(): ?array
     {
         return [];
     }

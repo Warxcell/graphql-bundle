@@ -14,6 +14,7 @@ use Arxy\GraphQL\SchemaBuilder;
 use Exception;
 use GraphQL\Server\StandardServer;
 use ReflectionClass;
+use Reflector;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -34,14 +35,14 @@ final class ArxyGraphQLExtension extends Extension
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
-        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.php');
         if ($debug) {
             $loader->load('services_dev.php');
         }
 
         $schemas = $config['schema'];
-        $schemas[] = __DIR__ . '/../Resources/graphql/schema.graphql';
+        $schemas[] = __DIR__.'/../Resources/graphql/schema.graphql';
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
         $schemaBuilderDef->setArgument('$debug', $debug);
 
@@ -71,7 +72,7 @@ final class ArxyGraphQLExtension extends Extension
         if (!$debug) {
             $cachedDocumentNodeProvider = new Definition(CachedDocumentNodeProvider::class);
             $cachedDocumentNodeProvider->setArgument('$documentNodeProvider', new Reference('.inner'));
-            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'] . '/schema.php');
+            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'].'/schema.php');
             $cachedDocumentNodeProvider->setDecoratedService(DocumentNodeProvider::class);
             $container->setDefinition(CachedDocumentNodeProvider::class, $cachedDocumentNodeProvider);
         }
@@ -79,8 +80,11 @@ final class ArxyGraphQLExtension extends Extension
         $container->registerAttributeForAutoconfiguration(Resolver::class, static function (
             ChildDefinition $definition,
             Resolver $resolver,
-            ReflectionClass $reflection
+            Reflector $reflection
         ): void {
+            if (!$reflection instanceof ReflectionClass) {
+                return;
+            }
             $definition->addTag('arxy.graphql.resolver', ['name' => $resolver->name ?? $reflection->getShortName()]);
         });
     }

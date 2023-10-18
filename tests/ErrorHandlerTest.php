@@ -5,7 +5,9 @@ namespace Arxy\GraphQL\Tests;
 use Arxy\GraphQL\ErrorHandler;
 use Exception;
 use GraphQL\Error\ClientAware;
+use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
+use GraphQL\Error\FormattedError;
 use LogicException;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -18,7 +20,7 @@ use function array_map;
 final class ErrorHandlerTest extends TestCase
 {
     /**
-     * @return iterable<string, array{Throwable, bool}[]>
+     * @return iterable<int, array{array{Throwable, bool}[]}>
      */
     public static function handleErrorsDataProvider(): iterable
     {
@@ -37,7 +39,6 @@ final class ErrorHandlerTest extends TestCase
             [[$errorWithThrowable, true]],
         ];
 
-
         $errorNotClientSafe = new Error(
             'Test', previous: new class extends Exception implements ClientAware {
             public function isClientSafe(): bool
@@ -47,7 +48,7 @@ final class ErrorHandlerTest extends TestCase
         }
         );
         yield [
-            [[$errorNotClientSafe, true]]
+            [[$errorNotClientSafe, true]],
         ];
 
 
@@ -119,9 +120,7 @@ final class ErrorHandlerTest extends TestCase
 
         $errorHandler = new ErrorHandler($logger, $logLevel);
 
-        $formatter = function (Throwable $throwable): string {
-            return (string)$throwable;
-        };
+        $formatter = FormattedError::prepareFormatter(null, DebugFlag::RETHROW_INTERNAL_EXCEPTIONS);
 
         $throwables = array_map(static fn(array $throwable): Throwable => $throwable[0], $data);
         $errorHandler->handleErrors($throwables, $formatter);

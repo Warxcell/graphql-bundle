@@ -4,7 +4,7 @@
     "license": "proprietary",
     "require": {
         "php": ">=8.1",
-        "webonyx/graphql-php": "dev-master",
+        "webonyx/graphql-php": "^15.7",
         "symfony/psr-http-message-bridge": "^2.1",
         "symfony/dependency-injection": "^5.0 | ^6.0",
         "psr/http-factory": "^1.0",
@@ -20,7 +20,8 @@
         "nette/php-generator": "^4.0",
         "arxy/graphql-codegen": "dev-main",
         "symfony/stopwatch": "^6.1",
-        "phpunit/phpunit": "^10.4"
+        "phpunit/phpunit": "^10.4",
+        "phpstan/phpstan": "^1.10"
     },
     "version": "1.0.0",
     "autoload": {

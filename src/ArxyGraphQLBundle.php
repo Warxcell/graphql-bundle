@@ -14,6 +14,7 @@ use GraphQL\Type\Definition\ScalarType;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Definition\UnionType;
 use LogicException;
+use ReflectionClass;
 use ReflectionEnum;
 use ReflectionException;
 use ReflectionMethod;
@@ -29,6 +30,7 @@ use function array_reverse;
 use function count;
 use function implode;
 use function in_array;
+use function is_callable;
 use function is_int;
 use function method_exists;
 use function sprintf;
@@ -43,6 +45,7 @@ final class ArxyGraphQLBundle extends Bundle
                 public function process(ContainerBuilder $container): void
                 {
                     $schemaBuilder = $container->get(SchemaBuilder::class);
+                    assert($schemaBuilder instanceof SchemaBuilder);
                     $schema = $schemaBuilder->makeSchema();
 
                     $debug = $container->getParameter('kernel.debug');
@@ -59,6 +62,8 @@ final class ArxyGraphQLBundle extends Bundle
                         $service = $container->getDefinition($serviceId);
 
                         $reflection = $container->getReflectionClass($service->getClass());
+
+                        assert($reflection instanceof ReflectionClass);
 
                         $resolveName = static function () use ($reflection): string {
                             $implements = $reflection->getInterfaces();
@@ -90,11 +95,13 @@ final class ArxyGraphQLBundle extends Bundle
                                     if ($class === null) {
                                         throw new LogicException(sprintf('Resolver for %s is missing', $graphqlName));
                                     }
+                                    $enumResolver = [$class, 'resolve'];
+                                    assert(is_callable($enumResolver));
 
                                     $values = new SplObjectStorage();
                                     foreach ($type->getValues() as $value) {
                                         try {
-                                            $values->offsetSet([$class, 'resolve']($value->name), $value);
+                                            $values->offsetSet($enumResolver($value->name), $value);
                                         } catch (Throwable $throwable) {
                                             throw new LogicException(
                                                 sprintf('Could not resolve enum %s.%s', $graphqlName, $value->name),
@@ -125,7 +132,12 @@ final class ArxyGraphQLBundle extends Bundle
                                             continue;
                                         }
                                         throw new LogicException(
-                                            sprintf('%s:%s not found in %s', $enumRefl->getName(), $case->name, $graphqlName),
+                                            sprintf(
+                                                '%s:%s not found in %s',
+                                                $enumRefl->getName(),
+                                                $case->name,
+                                                $graphqlName
+                                            ),
                                         );
                                     }
 
@@ -169,7 +181,12 @@ final class ArxyGraphQLBundle extends Bundle
                                             $graphqlName,
                                             $field
                                         ) {
-                                            $middlewareDefId = sprintf('arxy.graphql.middleware.%s.%s.%s', $graphqlName, $field, $serviceId);
+                                            $middlewareDefId = sprintf(
+                                                'arxy.graphql.middleware.%s.%s.%s',
+                                                $graphqlName,
+                                                $field,
+                                                $serviceId
+                                            );
                                             $middlewareDef = new Definition(
                                                 Closure::class,
                                                 [
@@ -197,7 +214,9 @@ final class ArxyGraphQLBundle extends Bundle
                                             $resolver = $actuallyWrapResolver($resolver, $middlewareId);
                                         };
 
-                                        $middlewares = array_reverse($container->getParameter('arxy.graphql.middlewares'));
+                                        $middlewares = array_reverse(
+                                            $container->getParameter('arxy.graphql.middlewares')
+                                        );
 
                                         if ($debug) {
                                             $middlewares[] = TimingMiddleware::class;
@@ -211,7 +230,11 @@ final class ArxyGraphQLBundle extends Bundle
                                             if ($graphqlNameOrInt !== $graphqlName) {
                                                 continue;
                                             }
-                                            foreach (array_reverse($middlewareOrFields) as $fieldOrInt => $middlewareOrField) {
+                                            foreach (
+                                                array_reverse(
+                                                    $middlewareOrFields
+                                                ) as $fieldOrInt => $middlewareOrField
+                                            ) {
                                                 if (is_int($fieldOrInt)) {
                                                     $wrapResolver($middlewareOrField);
                                                 } elseif ($fieldOrInt === $field) {
@@ -236,7 +259,8 @@ final class ArxyGraphQLBundle extends Bundle
                     $missingResolvers = [];
                     foreach ($schema->getTypeMap() as $type) {
                         // Version Compatibility between 14 / 15.
-                        $types = method_exists(Type::class, 'getAllBuiltInTypes') ? Type::getAllBuiltInTypes() : Type::builtInTypes();
+                        $types = method_exists(Type::class, 'getAllBuiltInTypes') ? Type::getAllBuiltInTypes(
+                        ) : Type::builtInTypes();
                         if (in_array($type, $types)) {
                             // standard types have built-in resolvers.
                             continue;

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-use Closure;
 use GraphQL\Executor\ExecutionResult;
 use Throwable;
 
@@ -19,5 +18,5 @@ interface ErrorHandlerInterface
      * @param ErrorFormatter $formatter
      * @return SerializableErrors
      */
-    public function handleErrors(array $errors, Closure $formatter): array;
+    public function handleErrors(array $errors, callable $formatter): array;
 }

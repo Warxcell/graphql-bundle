@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-use Closure;
+use BackedEnum;
 use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
@@ -20,6 +20,7 @@ use GraphQL\Language\AST\UnionTypeDefinitionNode;
 use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Schema;
+use GraphQL\Utils\ASTDefinitionBuilder;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
@@ -28,10 +29,12 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
 use function count;
+use function is_callable;
 use function sprintf;
 
 /**
  * https://github.com/webonyx/graphql-php/issues/500
+ * @phpstan-import-type TypeConfigDecorator from ASTDefinitionBuilder
  */
 final class SchemaBuilder
 {
@@ -41,7 +44,10 @@ final class SchemaBuilder
     ) {
     }
 
-    public function makeSchema(?Closure $typeConfigDecorator = null): Schema
+    /**
+     * @param TypeConfigDecorator|null $typeConfigDecorator
+     */
+    public function makeSchema(?callable $typeConfigDecorator = null): Schema
     {
         $document = $this->documentNodeProvider->getDocumentNode();
 
@@ -74,7 +80,10 @@ final class SchemaBuilder
     }
 
     /**
-     * @param array<string, array<string, callable>> $resolvers
+     * @param array<string, array<string, callable(): mixed>|object{resolve: callable(): mixed}|object{resolveType: callable(): string}> $resolvers
+     * @param array<string, array<string, class-string>> $argumentsMapping
+     * @param array<string, class-string> $inputObjectsMapping
+     * @param array<string, class-string<BackedEnum>> $enumsMapping
      * @throws Error
      * @throws SyntaxError
      */
@@ -116,7 +125,6 @@ final class SchemaBuilder
         $typeConfigDecorator = static function (
             array $typeConfig,
             TypeDefinitionNode $typeDefinitionNode,
-            array $definitionMap
         ) use ($resolvers, $resolver, $enumsMapping, $inputObjectsMapping): array {
             $name = $typeConfig['name'];
             $typeResolvers = $resolvers[$name] ?? null;
@@ -125,8 +133,8 @@ final class SchemaBuilder
                 case UnionTypeDefinitionNode::class:
                 case InterfaceTypeDefinitionNode::class:
                     assert($typeResolvers !== null, sprintf('Missing resolvers for union/interface %s', $name));
-
                     $resolveType = [$typeResolvers, 'resolveType'];
+                    assert(is_callable($resolveType));
 
                     $typeConfig['resolveType'] = static function (
                         mixed $objectValue,
@@ -134,7 +142,6 @@ final class SchemaBuilder
                         ResolveInfo $info
                     ) use (
                         $resolveType,
-                        $definitionMap
                     ): Type|null {
                         $rawType = $resolveType($objectValue, $context, $info);
 
@@ -163,7 +170,9 @@ final class SchemaBuilder
 
                     foreach ($typeConfig['values'] as $key => &$value) {
                         if (isset($resolvers[$name])) {
-                            $enumValue = [$resolvers[$name], 'resolve']($key);
+                            $resolver = [$resolvers[$name], 'resolve'];
+                            assert(is_callable($resolver));
+                            $enumValue = $resolver($key);
                         } else {
                             $enumValue = $enum::from($key);
                         }
@@ -173,12 +182,13 @@ final class SchemaBuilder
                 case InputObjectTypeDefinitionNode::class:
                     if ($typeResolvers) {
                         $resolverCallable = [$typeResolvers, 'resolve'];
-                        $typeConfig['parseValue'] = static fn (array $values): mixed => $resolverCallable(...$values);
+                        assert(is_callable($resolverCallable));
+                        $typeConfig['parseValue'] = static fn(array $values): mixed => $resolverCallable(...$values);
                     } else {
                         $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
                         assert($class !== null, sprintf('Missing input %s', $name));
 
-                        $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
+                        $typeConfig['parseValue'] = static fn(array $values): object => new $class(...$values);
                     }
                     break;
             }

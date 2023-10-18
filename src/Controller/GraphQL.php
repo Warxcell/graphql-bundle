@@ -55,11 +55,41 @@ final class GraphQL
             ]);
         }
 
-        if ($result instanceof Promise) {
+        if ($result instanceof Promise || is_array($result)) {
             throw new LogicException('Promise not supported');
         }
 
         return $this->resultToResponse($result);
+    }
+
+    /**
+     * @return array<mixed>
+     * @throws RequestError
+     *
+     */
+    protected function decodeContent(string $rawBody): array
+    {
+        parse_str($rawBody, $bodyParams);
+
+        return $bodyParams;
+    }
+
+    protected function decodeJson(string $rawBody): array
+    {
+        try {
+            $bodyParams = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
+
+            if (!is_array($bodyParams)) {
+                $notArray = Utils::printSafeJson($bodyParams);
+                throw new RequestError(
+                    "Expected JSON object or array for \"application/json\" request, got: {$notArray}"
+                );
+            }
+        } catch (JsonException $exception) {
+            throw new RequestError('Expected JSON object or array for "application/json" request', 0, $exception);
+        }
+
+        return $bodyParams;
     }
 
     private function parseRequest(Request $request): OperationParams
@@ -123,34 +153,6 @@ final class GraphQL
         }
 
         return $value;
-    }
-
-    /**
-     * @return array<mixed>
-     * @throws RequestError
-     *
-     */
-    protected function decodeContent(string $rawBody): array
-    {
-        parse_str($rawBody, $bodyParams);
-
-        return $bodyParams;
-    }
-
-    protected function decodeJson(string $rawBody): array
-    {
-        try {
-            $bodyParams = json_decode($rawBody, true, 512, JSON_THROW_ON_ERROR);
-
-            if (!is_array($bodyParams)) {
-                $notArray = Utils::printSafeJson($bodyParams);
-                throw new RequestError("Expected JSON object or array for \"application/json\" request, got: {$notArray}");
-            }
-        } catch (JsonException $exception) {
-            throw new RequestError('Expected JSON object or array for "application/json" request', 0, $exception);
-        }
-
-        return $bodyParams;
     }
 
     /**

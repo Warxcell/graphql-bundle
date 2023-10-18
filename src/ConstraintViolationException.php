@@ -18,7 +18,25 @@ final class ConstraintViolationException extends RuntimeException implements Exc
         parent::__construct('Constraint violation');
     }
 
-    private function getViolationExtension(): iterable
+    public function getExtensions(): ?array
+    {
+        return ['violations' => $this->getViolationExtension()];
+    }
+
+    public function isClientSafe(): bool
+    {
+        return true;
+    }
+
+    public function getCategory(): string
+    {
+        return 'validation';
+    }
+
+    /**
+     * @return array{path: (string|int)[], message: string, code: string|null}[]
+     */
+    private function getViolationExtension(): array
     {
         $formatted = [];
         foreach ($this->constraintViolationList as $violation) {
@@ -39,26 +57,11 @@ final class ConstraintViolationException extends RuntimeException implements Exc
 
             $formatted[] = [
                 'path' => $path,
-                'message' => $violation->getMessage(),
+                'message' => (string)$violation->getMessage(),
                 'code' => $violation->getCode(),
             ];
         }
 
         return $formatted;
-    }
-
-    public function getExtensions(): array
-    {
-        return ['violations' => $this->getViolationExtension()];
-    }
-
-    public function isClientSafe(): bool
-    {
-        return true;
-    }
-
-    public function getCategory(): string
-    {
-        return 'validation';
     }
 }

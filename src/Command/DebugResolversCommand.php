@@ -20,6 +20,9 @@ use function str_repeat;
 class DebugResolversCommand extends Command
 {
     public function __construct(
+        /**
+         * @var array<string, array<string, array<int, string|array{string, string}>>>
+         */
         private readonly array $resolversInfo
     ) {
         parent::__construct();
@@ -52,7 +55,7 @@ class DebugResolversCommand extends Command
                     }
 
                     $table->addRow([
-                        $i === 0 ? $graphqlName . '.' . $field : null,
+                        $i === 0 ? $graphqlName.'.'.$field : null,
                         sprintf('%s %s::%s', $separator, $serviceId, $method),
                     ]);
                 }

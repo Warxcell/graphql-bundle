@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
-use Closure;
 use GraphQL\Error\ClientAware;
 use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
@@ -19,7 +18,7 @@ final class ErrorHandler implements ErrorHandlerInterface
     ) {
     }
 
-    public function handleErrors(array $errors, Closure $formatter): array
+    public function handleErrors(array $errors, callable $formatter): array
     {
         $formatted = [];
         foreach ($errors as $error) {

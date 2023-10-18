@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
+use GraphQL\Executor\Promise\Promise;
 use GraphQL\Server\Helper;
 use GraphQL\Server\RequestError;
 use GraphQL\Server\StandardServer;
+use LogicException;
 use Psr\Http\Message\ResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -37,7 +39,12 @@ final class RequestHandler implements RequestHandlerInterface
         $response = $this->responseFactory->createResponse();
         $stream = $this->streamFactory->createStream();
 
-        return $this->helper->toPsrResponse($result, $response, $stream);
+        $response = $this->helper->toPsrResponse($result, $response, $stream);;
+
+        if ($response instanceof Promise) {
+            throw new LogicException('Promise not supported');
+        }
+
+        return $response;
     }
 }
-
