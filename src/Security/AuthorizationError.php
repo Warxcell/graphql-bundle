@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Arxy\GraphQL;
+namespace Arxy\GraphQL\Security;
 
+use Arxy\GraphQL\ExceptionInterface;
 use RuntimeException;
 
 final class AuthorizationError extends RuntimeException implements ExceptionInterface
 {
     public function __construct(
-        string $message = 'You are not authorized!'
+        string $message = 'You are not authorized!',
     ) {
         parent::__construct($message);
     }

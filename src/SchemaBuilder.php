@@ -24,11 +24,8 @@ use GraphQL\Utils\ASTDefinitionBuilder;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
-use Symfony\Component\Security\Core\Security;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
-use function count;
 use function is_callable;
 use function sprintf;
 
@@ -81,7 +78,6 @@ final class SchemaBuilder
 
     /**
      * @param array<string, array<string, callable(): mixed>|object{resolve: callable(): mixed}|object{resolveType: callable(): string}> $resolvers
-     * @param array<string, array<string, class-string>> $argumentsMapping
      * @param array<string, class-string> $inputObjectsMapping
      * @param array<string, class-string<BackedEnum>> $enumsMapping
      * @throws Error
@@ -89,32 +85,12 @@ final class SchemaBuilder
      */
     public function makeExecutableSchema(
         array $resolvers,
-        array $argumentsMapping,
         array $inputObjectsMapping,
         array $enumsMapping,
-        Security $security,
-        ValidatorInterface $validator
     ): Schema {
         $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
-            $argumentsMapping,
-            $resolvers,
-            $validator,
-            $security
+            $resolvers
         ): mixed {
-            $isGrantedDirective = DirectiveHelper::getDirectiveValues('isGranted', $info);
-
-            if ($isGrantedDirective && !$security->isGranted($isGrantedDirective['role'])) {
-                throw new AuthorizationError();
-            }
-
-            $class = $argumentsMapping[$info->parentType->name][$info->fieldName] ?? null;
-            if ($class) {
-                $args = new $class(...$args);
-                $errors = $validator->validate($args);
-                if (count($errors) > 0) {
-                    throw new ConstraintViolationException($errors);
-                }
-            }
             $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
                 sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
             );
@@ -183,12 +159,12 @@ final class SchemaBuilder
                     if ($typeResolvers) {
                         $resolverCallable = [$typeResolvers, 'resolve'];
                         assert(is_callable($resolverCallable));
-                        $typeConfig['parseValue'] = static fn(array $values): mixed => $resolverCallable(...$values);
+                        $typeConfig['parseValue'] = static fn (array $values): mixed => $resolverCallable(...$values);
                     } else {
                         $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
                         assert($class !== null, sprintf('Missing input %s', $name));
 
-                        $typeConfig['parseValue'] = static fn(array $values): object => new $class(...$values);
+                        $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
                     }
                     break;
             }

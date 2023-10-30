@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\DependencyInjection;
 
+use Arxy\GraphQL\ArgumentMapperMiddleware;
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\DocumentNodeProvider;
@@ -35,21 +36,24 @@ final class ArxyGraphQLExtension extends Extension
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
-        $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
         $loader->load('services.php');
         if ($debug) {
             $loader->load('services_dev.php');
         }
 
         $schemas = $config['schema'];
-        $schemas[] = __DIR__.'/../Resources/graphql/schema.graphql';
+        $schemas[] = __DIR__ . '/../Resources/graphql/schema.graphql';
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
         $schemaBuilderDef->setArgument('$debug', $debug);
 
         $executableSchemaBuilderDef = $container->getDefinition('arxy.graphql.executable_schema');
-        $executableSchemaBuilderDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
+
         $executableSchemaBuilderDef->setArgument('$enumsMapping', $config['enums_mapping']);
         $executableSchemaBuilderDef->setArgument('$inputObjectsMapping', $config['input_objects_mapping']);
+
+        $argumentsMapperMiddlewareDef = $container->getDefinition(ArgumentMapperMiddleware::class);
+        $argumentsMapperMiddlewareDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
@@ -62,7 +66,6 @@ final class ArxyGraphQLExtension extends Extension
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
         $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);
 
-
         $container->registerForAutoconfiguration(ResolverInterface::class)->addTag('arxy.graphql.resolver');
 
         $documentNodeProvider = $container->getDefinition(DocumentNodeProvider::class);
@@ -72,7 +75,7 @@ final class ArxyGraphQLExtension extends Extension
         if (!$debug) {
             $cachedDocumentNodeProvider = new Definition(CachedDocumentNodeProvider::class);
             $cachedDocumentNodeProvider->setArgument('$documentNodeProvider', new Reference('.inner'));
-            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'].'/schema.php');
+            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'] . '/schema.php');
             $cachedDocumentNodeProvider->setDecoratedService(DocumentNodeProvider::class);
             $container->setDefinition(CachedDocumentNodeProvider::class, $cachedDocumentNodeProvider);
         }
