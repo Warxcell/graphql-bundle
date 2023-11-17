@@ -10,7 +10,7 @@ use Psr\Log\LogLevel;
 
 use function sprintf;
 
-final class ErrorHandler implements ErrorHandlerInterface
+final class ErrorsHandler implements ErrorsHandlerInterface
 {
     public function __construct(
         private readonly LoggerInterface $logger,

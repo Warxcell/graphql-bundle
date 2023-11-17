@@ -11,7 +11,7 @@ use Throwable;
  * @phpstan-import-type ErrorFormatter from ExecutionResult
  * @phpstan-import-type SerializableErrors from ExecutionResult
  */
-interface ErrorHandlerInterface
+interface ErrorsHandlerInterface
 {
     /**
      * @param list<Throwable> $errors

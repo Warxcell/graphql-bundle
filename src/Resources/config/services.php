@@ -10,7 +10,7 @@ use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
-use Arxy\GraphQL\ErrorHandler;
+use Arxy\GraphQL\ErrorsHandler;
 use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\SchemaBuilder;
 use Arxy\GraphQL\Security\SecurityMiddleware;
@@ -33,7 +33,7 @@ return function (ContainerConfigurator $configurator) {
         '$documentNodeProvider' => service(DocumentNodeProviderInterface::class),
     ]);
     $services->set(DocumentNodeProvider::class);
-    $services->set(ErrorHandler::class)
+    $services->set(ErrorsHandler::class)
         ->arg('$logLevel', param('arxy.graphql.error_handler.log_level'));
 
     $services->set('arxy.graphql.executable_schema', Schema::class)
@@ -42,12 +42,10 @@ return function (ContainerConfigurator $configurator) {
     $services->set(DumpSchemaCommand::class);
 
     $services->set(RequestHandler::class);
-    $services->set(StandardServer::class)
-        ->factory([StandardServerFactory::class, 'factory'])
-        ->arg('$schema', service('arxy.graphql.executable_schema'));
 
     $services->set(GraphQL::class)
-        ->tag('controller.service_arguments');
+        ->tag('controller.service_arguments')
+        ->arg('$schema', service('arxy.graphql.executable_schema'));
 
     $services->set(CacheWarmer::class);
 

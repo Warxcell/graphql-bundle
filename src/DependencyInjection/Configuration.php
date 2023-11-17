@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\ContextFactoryInterface;
-use Arxy\GraphQL\ErrorHandler;
+use Arxy\GraphQL\ErrorsHandler;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -56,8 +56,12 @@ final class Configuration implements ConfigurationInterface
                     ->cannotBeEmpty()
                 ->end()
                 ->scalarNode('errors_handler')
-                    ->defaultValue(ErrorHandler::class)
+                    ->defaultValue(ErrorsHandler::class)
                     ->cannotBeEmpty()
+                ->end()
+                ->scalarNode('persisted_query_loader')
+                      ->defaultNull()
+//                    ->defaultValue(PersistedQueryLoader::class)
                 ->end()
                 ->scalarNode('cache_dir')
                     ->defaultValue('%kernel.build_dir%/arxy_graphql')

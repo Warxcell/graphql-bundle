@@ -7,6 +7,7 @@ namespace Arxy\GraphQL\DependencyInjection;
 use Arxy\GraphQL\ArgumentMapperMiddleware;
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
+use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
 use Arxy\GraphQL\Resolver;
@@ -57,11 +58,15 @@ final class ArxyGraphQLExtension extends Extension
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
-        $controllerDef = $container->getDefinition(StandardServer::class);
+        $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
+        if ($config['persisted_query_loader']) {
+            $controllerDef->setArgument('$persistedQueryLoader', new Reference($config['persisted_query_loader']));
+        }
+
 
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
         $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);

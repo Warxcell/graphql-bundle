@@ -2,7 +2,7 @@
 
 namespace Arxy\GraphQL\Tests;
 
-use Arxy\GraphQL\ErrorHandler;
+use Arxy\GraphQL\ErrorsHandler;
 use Exception;
 use GraphQL\Error\ClientAware;
 use GraphQL\Error\DebugFlag;
@@ -118,7 +118,7 @@ final class ErrorHandlerTest extends TestCase
             $logger->expects(self::never())->method('log');
         }
 
-        $errorHandler = new ErrorHandler($logger, $logLevel);
+        $errorHandler = new ErrorsHandler($logger, $logLevel);
 
         $formatter = FormattedError::prepareFormatter(null, DebugFlag::RETHROW_INTERNAL_EXCEPTIONS);
 
