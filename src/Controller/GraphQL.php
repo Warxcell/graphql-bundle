@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\ContextFactoryInterface;
-use Arxy\GraphQL\ErrorsHandler;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
@@ -274,7 +273,7 @@ final class GraphQL
                 $result->extensions = $context->getExtensions();
             }
 
-            $result->setErrorsHandler(static function (
+            $result->setErrorsHandler(function (
                 array $errors,
                 callable $formatter
             ): array {
