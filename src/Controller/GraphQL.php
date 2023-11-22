@@ -25,8 +25,6 @@ use GraphQL\Utils\AST;
 use GraphQL\Utils\Utils;
 use JsonException;
 use LogicException;
-use Symfony\Bridge\PsrHttpMessage\Factory\PsrHttpFactory;
-use Symfony\Bridge\PsrHttpMessage\HttpFoundationFactoryInterface;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -59,11 +57,8 @@ final class GraphQL
      * @throws RequestError
      * @throws JsonException
      */
-    public function __invoke(
-        Request $request,
-        HttpFoundationFactoryInterface $psrToSymfony,
-        PsrHttpFactory $symfonyToPsr,
-    ): Response {
+    public function __invoke(Request $request): Response
+    {
         try {
             $params = $this->parseRequest($request);
 
