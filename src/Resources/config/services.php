@@ -14,9 +14,6 @@ use Arxy\GraphQL\ErrorsHandler;
 use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\SchemaBuilder;
 use Arxy\GraphQL\Security\SecurityMiddleware;
-use Arxy\GraphQL\StandardServerFactory;
-use Arxy\GraphQL\Validator\ValidatorMiddleware;
-use GraphQL\Server\StandardServer;
 use GraphQL\Type\Schema;
 use Psr\Log\LogLevel;
 
@@ -51,5 +48,4 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(SecurityMiddleware::class);
     $services->set(ArgumentMapperMiddleware::class);
-    $services->set(ValidatorMiddleware::class);
 };
