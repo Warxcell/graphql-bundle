@@ -23,7 +23,6 @@
         "phpunit/phpunit": "^10.4",
         "phpstan/phpstan": "^1.10"
     },
-    "version": "1.0.0",
     "autoload": {
         "psr-4": {
             "Arxy\\GraphQL\\": "src/"
