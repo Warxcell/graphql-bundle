@@ -6,7 +6,6 @@ namespace Arxy\GraphQL;
 
 use Arxy\GraphQL\Debug\TimingMiddleware;
 use Arxy\GraphQL\Security\SecurityMiddleware;
-use Arxy\GraphQL\Validator\ValidatorMiddleware;
 use Closure;
 use GraphQL\Language\AST\NodeKind;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
@@ -263,7 +262,6 @@ final class ArxyGraphQLBundle extends Bundle
                                             $container->getParameter('arxy.graphql.middlewares')
                                         );
 
-                                        $middlewares[] = ValidatorMiddleware::class;
                                         $middlewares[] = ArgumentMapperMiddleware::class;
                                         $middlewares[] = SecurityMiddleware::class;
                                         if ($debug) {
