@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL;
 
 use Arxy\GraphQL\Debug\TimingMiddleware;
+use Arxy\GraphQL\Security\SecurityCompilerPass;
 use Arxy\GraphQL\Security\SecurityMiddleware;
 use Closure;
 use GraphQL\Language\AST\NodeKind;
@@ -52,45 +53,6 @@ final class ArxyGraphQLBundle extends Bundle
                     $schemaBuilder = $container->get(SchemaBuilder::class);
                     assert($schemaBuilder instanceof SchemaBuilder);
                     $schema = $schemaBuilder->makeSchema();
-
-                    $documentProvider = $container->get(DocumentNodeProviderInterface::class);
-                    assert($documentProvider instanceof DocumentNodeProviderInterface);
-                    $document = $documentProvider->getDocumentNode();
-
-                    /** @var array<string, array<string, string>> $roles */
-                    $roles = [];
-
-                    $visitor = function (
-                        ObjectTypeDefinitionNode|ObjectTypeExtensionNode $definitionNode
-                    ) use (
-                        &$roles
-                    ) {
-                        foreach ($definitionNode->fields as $field) {
-                            foreach ($field->directives as $directive) {
-                                if ($directive->name->value === 'isGranted') {
-                                    foreach ($directive->arguments as $argument) {
-                                        if ($argument->name->value === 'role') {
-                                            if (!$argument->value instanceof StringValueNode) {
-                                                throw new LogicException('Role argument not String');
-                                            }
-                                            $roles[$definitionNode->name->value][$field->name->value] = $argument->value->value;
-
-                                            continue 3;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    };
-                    Visitor::visit($document, [
-                        'enter' => [
-                            NodeKind::OBJECT_TYPE_DEFINITION => $visitor,
-                            NodeKind::OBJECT_TYPE_EXTENSION => $visitor,
-                        ],
-                    ]);
-
-                    $securityDefinition = $container->getDefinition(SecurityMiddleware::class);
-                    $securityDefinition->setArgument('$roles', $roles);
 
                     $debug = $container->getParameter('kernel.debug');
 
@@ -369,5 +331,7 @@ final class ArxyGraphQLBundle extends Bundle
                 }
             }
         );
+
+        $container->addCompilerPass(new SecurityCompilerPass());
     }
 }
