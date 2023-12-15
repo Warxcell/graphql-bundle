@@ -226,8 +226,11 @@ final class GraphQL
                 ? $this->loadPersistedQuery($op)
                 : $op->query;
 
+            $validationRules = [];
+
             if (!$doc instanceof DocumentNode) {
                 $doc = Parser::parse($doc);
+                $validationRules = null;
             }
 
             $operationAST = AST::getOperationAST($doc, $op->operation);
@@ -251,7 +254,7 @@ final class GraphQL
                 variableValues: $op->variables,
                 operationName: $op->operation,
                 fieldResolver: null,
-                validationRules: null
+                validationRules: $validationRules
             );
         } catch (RequestError $e) {
             $result = $promiseAdapter->createFulfilled(
@@ -316,28 +319,28 @@ final class GraphQL
         if (!\is_string($query)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "query" must be string, but got '
-                .Utils::printSafeJson($params->query)
+                . Utils::printSafeJson($params->query)
             );
         }
 
         if (!\is_string($queryId)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "queryId" must be string, but got '
-                .Utils::printSafeJson($params->queryId)
+                . Utils::printSafeJson($params->queryId)
             );
         }
 
         if ($params->operation !== null && !\is_string($params->operation)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "operation" must be string, but got '
-                .Utils::printSafeJson($params->operation)
+                . Utils::printSafeJson($params->operation)
             );
         }
 
         if ($params->variables !== null && (!\is_array($params->variables) || isset($params->variables[0]))) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "variables" must be object or JSON string parsed to object, but got '
-                .Utils::printSafeJson($params->originalInput['variables'])
+                . Utils::printSafeJson($params->originalInput['variables'])
             );
         }
 
