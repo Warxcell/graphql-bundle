@@ -227,60 +227,55 @@ final class GraphQL
                 );
             }
 
-            try {
-                $cacheItem = $this->queryCache->getItem(md5($op->query));
 
-                if ($cacheItem->isHit()) {
-                    $documentNode = AST::fromArray($cacheItem->get());
-                } else {
-                    $documentNode = Parser::parse($op->query);
+            $cacheItem = $this->queryCache->getItem(md5($op->query));
 
-                    $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
-                    assert(
-                        $queryComplexity instanceof QueryComplexity,
-                        'should not register a different rule for QueryComplexity'
+            if ($cacheItem->isHit()) {
+                $documentNode = AST::fromArray($cacheItem->get());
+            } else {
+                $documentNode = Parser::parse($op->query);
+
+                $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
+                assert(
+                    $queryComplexity instanceof QueryComplexity,
+                    'should not register a different rule for QueryComplexity'
+                );
+
+                $queryComplexity->setRawVariableValues($op->variables);
+
+
+                $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
+
+                if ($validationErrors !== []) {
+                    return $promiseAdapter->createFulfilled(
+                        new ExecutionResult(null, $validationErrors)
                     );
-
-                    $queryComplexity->setRawVariableValues($op->variables);
-
-
-                    $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
-
-                    if ($validationErrors !== []) {
-                        return $promiseAdapter->createFulfilled(
-                            new ExecutionResult(null, $validationErrors)
-                        );
-                    } else {
-                        $cacheItem->set(AST::toArray($documentNode));
-                        $this->queryCache->save($cacheItem);
-                    }
+                } else {
+                    $cacheItem->set(AST::toArray($documentNode));
+                    $this->queryCache->save($cacheItem);
                 }
-
-                $operationAST = AST::getOperationAST($documentNode, $op->operation);
-
-                if ($operationAST === null) {
-                    throw new RequestError('Failed to determine operation type');
-                }
-
-                $operationType = $operationAST->operation;
-                if ($operationType !== 'query' && $op->readOnly) {
-                    throw new RequestError('GET supports only query operation');
-                }
-
-                $context = $this->contextFactory?->createContext($op, $documentNode, $operationType);
-                $result = Executor::promiseToExecute(
-                    promiseAdapter: $promiseAdapter,
-                    schema: $this->schema,
-                    documentNode: $documentNode,
-                    contextValue: $context,
-                    variableValues: $op->variables,
-                    operationName: $op->operation,
-                );
-            } catch (Error $e) {
-                $result = $promiseAdapter->createFulfilled(
-                    new ExecutionResult(null, [$e])
-                );
             }
+
+            $operationAST = AST::getOperationAST($documentNode, $op->operation);
+
+            if ($operationAST === null) {
+                throw new RequestError('Failed to determine operation type');
+            }
+
+            $operationType = $operationAST->operation;
+            if ($operationType !== 'query' && $op->readOnly) {
+                throw new RequestError('GET supports only query operation');
+            }
+
+            $context = $this->contextFactory?->createContext($op, $documentNode, $operationType);
+            $result = Executor::promiseToExecute(
+                promiseAdapter: $promiseAdapter,
+                schema: $this->schema,
+                documentNode: $documentNode,
+                contextValue: $context,
+                variableValues: $op->variables,
+                operationName: $op->operation,
+            );
         } catch (RequestError $e) {
             $result = $promiseAdapter->createFulfilled(
                 new ExecutionResult(null, [Error::createLocatedError($e)])
