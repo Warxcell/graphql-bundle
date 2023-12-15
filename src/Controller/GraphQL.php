@@ -53,7 +53,7 @@ final class GraphQL
         private readonly bool $debug,
         private readonly ErrorsHandlerInterface $errorsHandler,
         private readonly Schema $schema,
-        private readonly CacheItemPoolInterface $cache,
+        private readonly CacheItemPoolInterface $queryCache,
         private readonly ContextFactoryInterface|null $contextFactory = null,
     ) {
     }
@@ -228,7 +228,7 @@ final class GraphQL
             }
 
             try {
-                $cacheItem = $this->cache->getItem(md5($op->query));
+                $cacheItem = $this->queryCache->getItem(md5($op->query));
 
                 if ($cacheItem->isHit()) {
                     $documentNode = AST::fromArray($cacheItem->get());
@@ -252,7 +252,7 @@ final class GraphQL
                         );
                     } else {
                         $cacheItem->set(AST::toArray($documentNode));
-                        $this->cache->save($cacheItem);
+                        $this->queryCache->save($cacheItem);
                     }
                 }
 
