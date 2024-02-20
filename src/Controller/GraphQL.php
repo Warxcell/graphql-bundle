@@ -8,7 +8,6 @@ use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
-use Arxy\GraphQL\QueryCache;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
 use GraphQL\Error\FormattedError;
@@ -68,15 +67,46 @@ final class GraphQL
             $params = $this->parseRequest($request);
 
             $result = $this->executeOperation($params);
+
+
+            if ($this->promiseAdapter instanceof SyncPromiseAdapter) {
+                $result = $this->promiseAdapter->wait($result);
+            } else {
+                throw new LogicException('Promise not supported');
+            }
         } catch (Throwable $throwable) {
             $result = new ExecutionResult(null, [
                 Error::createLocatedError($throwable),
             ]);
         }
 
-        if ($result instanceof Promise || is_array($result)) {
-            throw new LogicException('Promise not supported');
-        }
+        $result->setErrorsHandler(function (
+            array $errors,
+            callable $formatter
+        ): array {
+            return $this->errorsHandler->handleErrors($errors, static function (Throwable $error) use (
+                $formatter
+            ): array {
+                $formatted = $formatter($error);
+
+                $previous = $error->getPrevious();
+                if ($previous instanceof ExceptionInterface) {
+                    $formatted['extensions'] = [
+                        ...($formatted['extensions'] ?? []),
+                        'category' => $previous->getCategory(),
+                    ];
+                }
+
+                return $formatted;
+            });
+        });
+
+        $result->setErrorFormatter(
+            FormattedError::prepareFormatter(
+                formatter: null,
+                debug: $this->debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE
+            )
+        );
 
         return $this->resultToResponse($result);
     }
@@ -196,16 +226,9 @@ final class GraphQL
         throw new RequestError("HTTP Method \"{$method}\" is not supported");
     }
 
-    private function executeOperation(OperationParams $op)
+    private function executeOperation(OperationParams $op): Promise
     {
-        $promiseAdapter = $this->promiseAdapter;
-        $result = $this->promiseToExecuteOperation($promiseAdapter, $op);
-
-        if ($promiseAdapter instanceof SyncPromiseAdapter) {
-            $result = $promiseAdapter->wait($result);
-        }
-
-        return $result;
+        return $this->promiseToExecuteOperation($this->promiseAdapter, $op);
     }
 
     private function promiseToExecuteOperation(
@@ -290,34 +313,6 @@ final class GraphQL
             if ($context instanceof ExtensionsAwareContext) {
                 $result->extensions = $context->getExtensions();
             }
-
-            $result->setErrorsHandler(function (
-                array $errors,
-                callable $formatter
-            ): array {
-                return $this->errorsHandler->handleErrors($errors, static function (Throwable $error) use (
-                    $formatter
-                ): array {
-                    $formatted = $formatter($error);
-
-                    $previous = $error->getPrevious();
-                    if ($previous instanceof ExceptionInterface) {
-                        $formatted['extensions'] = [
-                            ...($formatted['extensions'] ?? []),
-                            'category' => $previous->getCategory(),
-                        ];
-                    }
-
-                    return $formatted;
-                });
-            });
-
-            $result->setErrorFormatter(
-                FormattedError::prepareFormatter(
-                    formatter: null,
-                    debug: $this->debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE
-                )
-            );
 
             return $result;
         };
