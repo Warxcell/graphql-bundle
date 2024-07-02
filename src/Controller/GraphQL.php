@@ -8,6 +8,7 @@ use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
+use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
 use GraphQL\Error\FormattedError;
@@ -47,44 +48,27 @@ use const JSON_THROW_ON_ERROR;
 
 final class GraphQL
 {
+    private readonly Closure $errorFormatter;
+    private readonly Closure $errorsHandler;
+
     public function __construct(
         private readonly PromiseAdapter $promiseAdapter,
-        private readonly bool $debug,
-        private readonly ErrorsHandlerInterface $errorsHandler,
+        bool $debug,
+        ErrorsHandlerInterface $errorsHandler,
         private readonly Schema $schema,
         private readonly CacheItemPoolInterface $queryCache,
         private readonly ContextFactoryInterface|null $contextFactory = null,
     ) {
-    }
+        $this->errorFormatter = FormattedError::prepareFormatter(
+            formatter: null,
+            debug: $debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE
+        );
 
-    /**
-     * @throws RequestError
-     * @throws JsonException
-     */
-    public function __invoke(Request $request): Response
-    {
-        try {
-            $params = $this->parseRequest($request);
-
-            $result = $this->executeOperation($params);
-
-
-            if ($this->promiseAdapter instanceof SyncPromiseAdapter) {
-                $result = $this->promiseAdapter->wait($result);
-            } else {
-                throw new LogicException('Promise not supported');
-            }
-        } catch (Throwable $throwable) {
-            $result = new ExecutionResult(null, [
-                Error::createLocatedError($throwable),
-            ]);
-        }
-
-        $result->setErrorsHandler(function (
+        $this->errorsHandler = function (
             array $errors,
             callable $formatter
-        ): array {
-            return $this->errorsHandler->handleErrors($errors, static function (Throwable $error) use (
+        ) use ($errorsHandler): array {
+            return $errorsHandler->handleErrors($errors, static function (Throwable $error) use (
                 $formatter
             ): array {
                 $formatted = $formatter($error);
@@ -99,21 +83,40 @@ final class GraphQL
 
                 return $formatted;
             });
-        });
+        };
+    }
 
-        $result->setErrorFormatter(
-            FormattedError::prepareFormatter(
-                formatter: null,
-                debug: $this->debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE
-            )
-        );
+    /**
+     * @throws RequestError
+     * @throws JsonException
+     */
+    public function __invoke(Request $request): Response
+    {
+        try {
+            $params = $this->parseRequest($request);
+            $result = $this->promiseToExecuteOperation($this->promiseAdapter, $params);
+
+            if ($this->promiseAdapter instanceof SyncPromiseAdapter) {
+                $result = $this->promiseAdapter->wait($result);
+            } else {
+                throw new LogicException('Promise not supported');
+            }
+        } catch (Throwable $throwable) {
+            $result = new ExecutionResult(null, [
+                Error::createLocatedError($throwable),
+            ]);
+        }
+
+        $result->setErrorsHandler($this->errorsHandler);
+        $result->setErrorFormatter($this->errorFormatter);
 
         return $this->resultToResponse($result);
     }
 
     private function parseRequest(Request $request): OperationParams
     {
-        if ($request->getMethod() === 'GET') {
+        $method = $request->getMethod();
+        if ($method === 'GET') {
             $bodyParams = [];
         } else {
             $contentType = $request->headers->get('Content-Type');
@@ -144,12 +147,12 @@ final class GraphQL
                     }
                 }
             } else {
-                $bodyParams = $this->decodeContent((string)$request->getContent());
+                parse_str((string)$request->getContent(), $bodyParams);
             }
         }
 
         return $this->parseRequestParams(
-            $request->getMethod(),
+            $method,
             $bodyParams,
             $request->query->all()
         );
@@ -184,7 +187,12 @@ final class GraphQL
             throw new RequestError("The request must define a `$key`");
         }
 
-        $value = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        try {
+            $value = json_decode($value, true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException $exception) {
+            throw new RequestError("The `$key` key must be a JSON encoded array", previous: $exception);
+        }
+
         if (!is_array($value)) {
             throw new RequestError("The `$key` key must be a JSON encoded array");
         }
@@ -192,18 +200,10 @@ final class GraphQL
         return $value;
     }
 
+
     /**
-     * @return array<mixed>
      * @throws RequestError
-     *
      */
-    protected function decodeContent(string $rawBody): array
-    {
-        parse_str($rawBody, $bodyParams);
-
-        return $bodyParams;
-    }
-
     private function parseRequestParams(string $method, array $bodyParams, array $queryParams)
     {
         if ($method === 'GET') {
@@ -224,11 +224,6 @@ final class GraphQL
         }
 
         throw new RequestError("HTTP Method \"{$method}\" is not supported");
-    }
-
-    private function executeOperation(OperationParams $op): Promise
-    {
-        return $this->promiseToExecuteOperation($this->promiseAdapter, $op);
     }
 
     private function promiseToExecuteOperation(
@@ -331,28 +326,28 @@ final class GraphQL
             );
         }
 
-        if (!\is_string($query)) {
+        if (!is_string($query)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "query" must be string, but got '
                 .Utils::printSafeJson($params->query)
             );
         }
 
-        if (!\is_string($queryId)) {
+        if (!is_string($queryId)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "queryId" must be string, but got '
                 .Utils::printSafeJson($params->queryId)
             );
         }
 
-        if ($params->operation !== null && !\is_string($params->operation)) {
+        if ($params->operation !== null && !is_string($params->operation)) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "operation" must be string, but got '
                 .Utils::printSafeJson($params->operation)
             );
         }
 
-        if ($params->variables !== null && (!\is_array($params->variables) || isset($params->variables[0]))) {
+        if ($params->variables !== null && (!is_array($params->variables) || isset($params->variables[0]))) {
             $errors[] = new RequestError(
                 'GraphQL Request parameter "variables" must be object or JSON string parsed to object, but got '
                 .Utils::printSafeJson($params->originalInput['variables'])
