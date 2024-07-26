@@ -9,10 +9,13 @@ use GraphQL\Error\Error;
 use GraphQL\Error\SyntaxError;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\EnumTypeDefinitionNode;
+use GraphQL\Language\AST\FieldDefinitionNode;
 use GraphQL\Language\AST\InputObjectTypeDefinitionNode;
 use GraphQL\Language\AST\InterfaceTypeDefinitionNode;
+use GraphQL\Language\AST\InterfaceTypeExtensionNode;
 use GraphQL\Language\AST\NodeList;
 use GraphQL\Language\AST\ObjectTypeDefinitionNode;
+use GraphQL\Language\AST\ObjectTypeExtensionNode;
 use GraphQL\Language\AST\ScalarTypeDefinitionNode;
 use GraphQL\Language\AST\TypeDefinitionNode;
 use GraphQL\Language\AST\TypeExtensionNode;
@@ -24,6 +27,8 @@ use GraphQL\Utils\ASTDefinitionBuilder;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 use LogicException;
+
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
 use function is_callable;
@@ -44,7 +49,7 @@ final class SchemaBuilder
     /**
      * @param TypeConfigDecorator|null $typeConfigDecorator
      */
-    public function makeSchema(?callable $typeConfigDecorator = null): Schema
+    public function makeSchema(?callable $typeConfigDecorator = null, ?callable $fieldConfigDecorator = null): Schema
     {
         $document = $this->documentNodeProvider->getDocumentNode();
 
@@ -65,14 +70,16 @@ final class SchemaBuilder
         $schema = BuildSchema::build(
             new DocumentNode(['definitions' => new NodeList($nonExtendDefs)]),
             $typeConfigDecorator,
-            $options
+            $options,
+            $fieldConfigDecorator
         );
 
         return SchemaExtender::extend(
             $schema,
             new DocumentNode(['definitions' => new NodeList($extendDefs)]),
             $options,
-            $typeConfigDecorator
+            $typeConfigDecorator,
+            $fieldConfigDecorator
         );
     }
 
@@ -87,21 +94,13 @@ final class SchemaBuilder
         array $resolvers,
         array $inputObjectsMapping,
         array $enumsMapping,
+        array $argsMapping,
+        ValidatorInterface $validator
     ): Schema {
-        $resolver = static function (mixed $objectValue, mixed $args, mixed $contextValue, ResolveInfo $info) use (
-            $resolvers
-        ): mixed {
-            $objectResolver = $resolvers[$info->parentType->name][$info->fieldName] ?? throw new LogicException(
-                sprintf('Could not resolve %s.%s', $info->parentType->name, $info->fieldName)
-            );
-
-            return $objectResolver($objectValue, $args, $contextValue, $info);
-        };
-
         $typeConfigDecorator = static function (
             array $typeConfig,
             TypeDefinitionNode $typeDefinitionNode,
-        ) use ($resolvers, $resolver, $enumsMapping, $inputObjectsMapping): array {
+        ) use ($resolvers, $enumsMapping, $inputObjectsMapping): array {
             $name = $typeConfig['name'];
             $typeResolvers = $resolvers[$name] ?? null;
 
@@ -129,9 +128,6 @@ final class SchemaBuilder
                     };
                     break;
                 case ObjectTypeDefinitionNode::class:
-                    assert($typeResolvers !== null, sprintf('Missing resolvers for %s', $name));
-
-                    $typeConfig['resolveField'] = $resolver;
                     break;
                 case ScalarTypeDefinitionNode::class:
                     assert($typeResolvers !== null, sprintf('Missing resolvers for scalar %s', $name));
@@ -145,8 +141,8 @@ final class SchemaBuilder
                     assert($enum !== null, sprintf('Missing enum %s', $name));
 
                     foreach ($typeConfig['values'] as $key => &$value) {
-                        if (isset($resolvers[$name])) {
-                            $resolver = [$resolvers[$name], 'resolve'];
+                        if ($typeResolvers) {
+                            $resolver = [$typeResolvers, 'resolve'];
                             assert(is_callable($resolver));
                             $enumValue = $resolver($key);
                         } else {
@@ -159,12 +155,12 @@ final class SchemaBuilder
                     if ($typeResolvers) {
                         $resolverCallable = [$typeResolvers, 'resolve'];
                         assert(is_callable($resolverCallable));
-                        $typeConfig['parseValue'] = static fn (array $values): mixed => $resolverCallable(...$values);
+                        $typeConfig['parseValue'] = static fn(array $values): mixed => $resolverCallable(...$values);
                     } else {
                         $class = $inputObjectsMapping[$typeDefinitionNode->name->value] ?? null;
                         assert($class !== null, sprintf('Missing input %s', $name));
 
-                        $typeConfig['parseValue'] = static fn (array $values): object => new $class(...$values);
+                        $typeConfig['parseValue'] = static fn(array $values): object => new $class(...$values);
                     }
                     break;
             }
@@ -172,6 +168,25 @@ final class SchemaBuilder
             return $typeConfig;
         };
 
-        return $this->makeSchema($typeConfigDecorator);
+        $fieldConfigDecorator = static function (
+            array $config,
+            FieldDefinitionNode $fieldDefinitionNode,
+            ObjectTypeDefinitionNode|ObjectTypeExtensionNode|InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $node
+        ) use ($resolvers, $argsMapping, $validator): array {
+            if (!$node instanceof ObjectTypeDefinitionNode) {
+                return $config;
+            }
+
+            $config['resolve'] = $resolvers[$node->name->value][$fieldDefinitionNode->name->value];
+
+            $argsClass = $argsMapping[$node->name->value][$fieldDefinitionNode->name->value] ?? null;
+            if ($argsClass) {
+                $config['argsMapper'] = new ArgumentMapper($argsClass, $validator);
+            }
+
+            return $config;
+        };
+
+        return $this->makeSchema($typeConfigDecorator, $fieldConfigDecorator);
     }
 }

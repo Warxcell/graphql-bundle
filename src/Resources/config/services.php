@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
-use Arxy\GraphQL\ArgumentMapperMiddleware;
+use Arxy\GraphQL\ArgumentMapper;
 use Arxy\GraphQL\CacheWarmer;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\Controller\GraphQL;
@@ -47,5 +47,5 @@ return function (ContainerConfigurator $configurator) {
     $services->set(CacheWarmer::class);
 
     $services->set(SecurityMiddleware::class);
-    $services->set(ArgumentMapperMiddleware::class);
+    $services->set(ArgumentMapper::class);
 };

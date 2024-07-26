@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\DependencyInjection;
 
-use Arxy\GraphQL\ArgumentMapperMiddleware;
+use Arxy\GraphQL\ArgumentMapper;
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
 use Arxy\GraphQL\Controller\GraphQL;
@@ -51,9 +51,7 @@ final class ArxyGraphQLExtension extends Extension
 
         $executableSchemaBuilderDef->setArgument('$enumsMapping', $config['enums_mapping']);
         $executableSchemaBuilderDef->setArgument('$inputObjectsMapping', $config['input_objects_mapping']);
-
-        $argumentsMapperMiddlewareDef = $container->getDefinition(ArgumentMapperMiddleware::class);
-        $argumentsMapperMiddlewareDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
+        $executableSchemaBuilderDef->setArgument('$argsMapping', $config['arguments_mapping']);
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 

@@ -1,6 +1,29 @@
 <?php
 
 declare(strict_types=1);
+/*
+ * Copyright (C) 2016-2024 Taylor & Hart Limited
+ * All Rights Reserved.
+ *
+ * NOTICE: All information contained herein is, and remains the property
+ * of Taylor & Hart Limited and its suppliers, if any.
+ *
+ * All   intellectual   and  technical  concepts  contained  herein  are
+ * proprietary  to  Taylor & Hart Limited  and  its suppliers and may be
+ * covered  by  U.K.  and  foreign  patents, patents in process, and are
+ * protected in full by copyright law. Dissemination of this information
+ * or  reproduction  of this material is strictly forbidden unless prior
+ * written permission is obtained from Taylor & Hart Limited.
+ *
+ * ANY  REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC PERFORMANCE, OR
+ * PUBLIC  DISPLAY  OF  OR  THROUGH  USE OF THIS SOURCE CODE WITHOUT THE
+ * EXPRESS  WRITTEN CONSENT OF RARE PINK LIMITED IS STRICTLY PROHIBITED,
+ * AND  IN  VIOLATION  OF  APPLICABLE LAWS. THE RECEIPT OR POSSESSION OF
+ * THIS  SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY
+ * ANY  RIGHTS  TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO
+ * MANUFACTURE,  USE, OR SELL ANYTHING THAT IT MAY DESCRIBE, IN WHOLE OR
+ * IN PART.
+ */
 
 namespace Arxy\GraphQL;
 
@@ -8,11 +31,7 @@ use Arxy\GraphQL\Debug\TimingMiddleware;
 use Arxy\GraphQL\Security\SecurityCompilerPass;
 use Arxy\GraphQL\Security\SecurityMiddleware;
 use Closure;
-use GraphQL\Language\AST\NodeKind;
-use GraphQL\Language\AST\ObjectTypeDefinitionNode;
-use GraphQL\Language\AST\ObjectTypeExtensionNode;
 use GraphQL\Language\AST\StringValueNode;
-use GraphQL\Language\Visitor;
 use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\InterfaceType;
@@ -34,6 +53,7 @@ use Symfony\Component\HttpKernel\Bundle\Bundle;
 use Throwable;
 
 use function array_reverse;
+use function assert;
 use function count;
 use function implode;
 use function in_array;
@@ -47,7 +67,7 @@ final class ArxyGraphQLBundle extends Bundle
     public function build(ContainerBuilder $container): void
     {
         $container->addCompilerPass(
-            new class implements CompilerPassInterface {
+            new class() implements CompilerPassInterface {
                 public function process(ContainerBuilder $container): void
                 {
                     $schemaBuilder = $container->get(SchemaBuilder::class);
@@ -98,7 +118,7 @@ final class ArxyGraphQLBundle extends Bundle
                                     $definition = $container->getDefinition($serviceId);
                                     $class = $definition->getClass();
 
-                                    if ($class === null) {
+                                    if (null === $class) {
                                         throw new LogicException(sprintf('Resolver for %s is missing', $graphqlName));
                                     }
                                     $enumResolver = [$class, 'resolve'];
@@ -166,12 +186,13 @@ final class ArxyGraphQLBundle extends Bundle
                                     $methods = $reflection->getMethods(ReflectionMethod::IS_PUBLIC);
 
                                     foreach ($methods as $method) {
-                                        if ($method->isConstructor()) {
+                                        $field = $method->getName();
+
+                                        if ($method->isConstructor() || !$type->hasField($field)) {
                                             continue;
                                         }
 
                                         $resolverInfo = [];
-                                        $field = $method->getName();
 
                                         if (isset($resolvers[$graphqlName][$field])) {
                                             throw new LogicException(
@@ -208,11 +229,7 @@ final class ArxyGraphQLBundle extends Bundle
                                         };
 
                                         $wrapResolver = function ($middlewareId) use (
-                                            $container,
-                                            $graphqlName,
-                                            $field,
                                             &$resolver,
-                                            $debug,
                                             &$actuallyWrapResolver,
                                             &$resolverInfo
                                         ): void {
@@ -224,8 +241,39 @@ final class ArxyGraphQLBundle extends Bundle
                                             $container->getParameter('arxy.graphql.middlewares')
                                         );
 
-                                        $middlewares[] = ArgumentMapperMiddleware::class;
-                                        $middlewares[] = SecurityMiddleware::class;
+                                        $fieldDefinition = $type->getField($field);
+
+                                        foreach ($fieldDefinition->astNode->directives as $directive) {
+                                            if ('isGranted' === $directive->name->value) {
+                                                foreach ($directive->arguments as $argument) {
+                                                    if ('role' === $argument->name->value) {
+                                                        if (!$argument->value instanceof StringValueNode) {
+                                                            throw new LogicException('Role argument not String');
+                                                        }
+
+                                                        $securityMiddlewareId = sprintf(
+                                                            'security_middleware_%s_%s',
+                                                            $graphqlName,
+                                                            $field
+                                                        );
+                                                        $container->setDefinition(
+                                                            $securityMiddlewareId,
+                                                            new Definition(
+                                                                SecurityMiddleware::class,
+                                                                [
+                                                                    '$role' => $argument->value->value,
+                                                                ]
+                                                            )
+                                                        );
+
+                                                        $middlewares[$graphqlName][$field][] = $securityMiddlewareId;
+
+                                                        continue 2;
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         if ($debug) {
                                             $middlewares[] = TimingMiddleware::class;
                                         }
@@ -331,7 +379,5 @@ final class ArxyGraphQLBundle extends Bundle
                 }
             }
         );
-
-        $container->addCompilerPass(new SecurityCompilerPass());
     }
 }
