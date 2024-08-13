@@ -16,6 +16,7 @@ use Arxy\GraphQL\SchemaBuilder;
 use Exception;
 use ReflectionClass;
 use Reflector;
+use Sentry\State\HubInterface;
 use Symfony\Component\Config\FileLocator;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -23,6 +24,7 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ArxyGraphQLExtension extends Extension
 {
@@ -40,6 +42,12 @@ final class ArxyGraphQLExtension extends Extension
         $loader->load('services.php');
         if ($debug) {
             $loader->load('services_dev.php');
+        }
+
+        $hasSentry = $container::willBeAvailable('sentry/sentry', HubInterface::class, ['arxy/graphql-bundle']);
+
+        if ($hasSentry) {
+            $loader->load('services_sentry.php');
         }
 
         $schemas = $config['schema'];

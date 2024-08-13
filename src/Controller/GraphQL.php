@@ -6,8 +6,11 @@ namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\ErrorsHandlerInterface;
+use Arxy\GraphQL\Events\OnExecute;
+use Arxy\GraphQL\Events\OnExecuteDone;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
+use Arxy\GraphQL\OperationParams;
 use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
@@ -15,10 +18,8 @@ use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Executor;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
-use GraphQL\Executor\Promise\Promise;
 use GraphQL\Executor\Promise\PromiseAdapter;
 use GraphQL\Language\Parser;
-use GraphQL\Server\OperationParams;
 use GraphQL\Server\RequestError;
 use GraphQL\Type\Schema;
 use GraphQL\Utils\AST;
@@ -26,14 +27,13 @@ use GraphQL\Utils\Utils;
 use GraphQL\Validator\DocumentValidator;
 use GraphQL\Validator\Rules\QueryComplexity;
 use JsonException;
-use LogicException;
 use Psr\Cache\CacheItemPoolInterface;
+use Psr\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
-use function array_map;
 use function assert;
 use function explode;
 use function is_array;
@@ -46,18 +46,19 @@ use function str_contains;
 
 use const JSON_THROW_ON_ERROR;
 
-final class GraphQL
+final readonly class GraphQL
 {
-    private readonly Closure $errorFormatter;
-    private readonly Closure $errorsHandler;
+    private Closure $errorFormatter;
+    private Closure $errorsHandler;
 
     public function __construct(
-        private readonly PromiseAdapter $promiseAdapter,
+        private EventDispatcherInterface $dispatcher,
+        private SyncPromiseAdapter $promiseAdapter,
         bool $debug,
         ErrorsHandlerInterface $errorsHandler,
-        private readonly Schema $schema,
-        private readonly CacheItemPoolInterface $queryCache,
-        private readonly ContextFactoryInterface|null $contextFactory = null,
+        private Schema $schema,
+        private CacheItemPoolInterface $queryCache,
+        private ContextFactoryInterface|null $contextFactory = null,
     ) {
         $this->errorFormatter = FormattedError::prepareFormatter(
             formatter: null,
@@ -95,12 +96,6 @@ final class GraphQL
         try {
             $params = $this->parseRequest($request);
             $result = $this->promiseToExecuteOperation($this->promiseAdapter, $params);
-
-            if ($this->promiseAdapter instanceof SyncPromiseAdapter) {
-                $result = $this->promiseAdapter->wait($result);
-            } else {
-                throw new LogicException('Promise not supported');
-            }
         } catch (Throwable $throwable) {
             $result = new ExecutionResult(null, [
                 Error::createLocatedError($throwable),
@@ -113,49 +108,52 @@ final class GraphQL
         return $this->resultToResponse($result);
     }
 
+    /**
+     * @throws RequestError
+     */
     private function parseRequest(Request $request): OperationParams
     {
         $method = $request->getMethod();
-        if ($method === 'GET') {
-            $bodyParams = [];
-        } else {
-            $contentType = $request->headers->get('Content-Type');
 
-            if (null === $contentType) {
-                throw new RequestError('Missing "Content-Type" header');
-            }
+        switch ($method) {
+            case 'GET':
+                return $this->validateOperationParams($request->query->all(), true);
+            case 'POST':
+                $contentType = $request->headers->get('Content-Type');
 
-            if (str_contains($contentType, 'application/graphql')) {
-                $bodyParams = ['query' => (string)$request->getContent()];
-            } elseif (str_contains($contentType, 'application/json')) {
-                $bodyParams = $this->decodeJson((string)$request->getContent());
-            } elseif (str_contains($contentType, 'multipart/form-data')) {
-                $map = $this->decodeArray($request->request, 'map');
-                $bodyParams = $this->decodeArray($request->request, 'operations');
-
-                foreach ($map as $fileKey => $locations) {
-                    foreach ($locations as $location) {
-                        $items = &$bodyParams;
-                        foreach (explode('.', $location) as $key) {
-                            if (!isset($items[$key]) || !is_array($items[$key])) {
-                                $items[$key] = [];
-                            }
-                            $items = &$items[$key];
-                        }
-
-                        $items = $request->files->get((string)$fileKey);
-                    }
+                if (null === $contentType) {
+                    throw new RequestError('Missing "Content-Type" header');
                 }
-            } else {
-                parse_str((string)$request->getContent(), $bodyParams);
-            }
-        }
 
-        return $this->parseRequestParams(
-            $method,
-            $bodyParams,
-            $request->query->all()
-        );
+                if (str_contains($contentType, 'application/graphql')) {
+                    $bodyParams = ['query' => (string)$request->getContent()];
+                } elseif (str_contains($contentType, 'application/json')) {
+                    $bodyParams = $this->decodeJson((string)$request->getContent());
+                } elseif (str_contains($contentType, 'multipart/form-data')) {
+                    $map = $this->decodeArray($request->request, 'map');
+                    $bodyParams = $this->decodeArray($request->request, 'operations');
+
+                    foreach ($map as $fileKey => $locations) {
+                        foreach ($locations as $location) {
+                            $items = &$bodyParams;
+                            foreach (explode('.', $location) as $key) {
+                                if (!isset($items[$key]) || !is_array($items[$key])) {
+                                    $items[$key] = [];
+                                }
+                                $items = &$items[$key];
+                            }
+
+                            $items = $request->files->get((string)$fileKey);
+                        }
+                    }
+                } else {
+                    parse_str((string)$request->getContent(), $bodyParams);
+                }
+
+                return $this->validateOperationParams($bodyParams);
+            default:
+                throw new RequestError("HTTP Method \"{$method}\" is not supported");
+        }
     }
 
     protected function decodeJson(string $rawBody): array
@@ -178,7 +176,6 @@ final class GraphQL
 
     /**
      * @throws RequestError
-     * @throws JsonException
      */
     private function decodeArray(InputBag $bodyParams, string $key): array
     {
@@ -200,58 +197,17 @@ final class GraphQL
         return $value;
     }
 
-
-    /**
-     * @throws RequestError
-     */
-    private function parseRequestParams(string $method, array $bodyParams, array $queryParams)
-    {
-        if ($method === 'GET') {
-            return OperationParams::create($queryParams, true);
-        }
-
-        if ($method === 'POST') {
-            if (isset($bodyParams[0])) {
-                $operations = [];
-                foreach ($bodyParams as $entry) {
-                    $operations[] = OperationParams::create($entry);
-                }
-
-                return $operations;
-            }
-
-            return OperationParams::create($bodyParams);
-        }
-
-        throw new RequestError("HTTP Method \"{$method}\" is not supported");
-    }
-
     private function promiseToExecuteOperation(
         PromiseAdapter $promiseAdapter,
-        OperationParams $op
-    ): Promise {
-        $context = null;
+        OperationParams $params
+    ): ExecutionResult {
         try {
-            $errors = $this->validateOperationParams($op);
-
-            if ($errors !== []) {
-                $locatedErrors = array_map(
-                    [Error::class, 'createLocatedError'],
-                    $errors
-                );
-
-                return $promiseAdapter->createFulfilled(
-                    new ExecutionResult(null, $locatedErrors)
-                );
-            }
-
-
-            $cacheItem = $this->queryCache->getItem(md5($op->query));
+            $cacheItem = $this->queryCache->getItem(md5($params->query));
 
             if ($cacheItem->isHit()) {
                 $documentNode = AST::fromArray($cacheItem->get());
             } else {
-                $documentNode = Parser::parse($op->query);
+                $documentNode = Parser::parse($params->query);
 
                 $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
                 assert(
@@ -259,102 +215,108 @@ final class GraphQL
                     'should not register a different rule for QueryComplexity'
                 );
 
-                $queryComplexity->setRawVariableValues($op->variables);
-
-
+                $queryComplexity->setRawVariableValues($params->variables);
                 $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
 
                 if ($validationErrors !== []) {
-                    return $promiseAdapter->createFulfilled(
-                        new ExecutionResult(null, $validationErrors)
-                    );
+                    return new ExecutionResult(null, $validationErrors);
                 } else {
                     $cacheItem->set(AST::toArray($documentNode));
                     $this->queryCache->save($cacheItem);
                 }
             }
 
-            $operationAST = AST::getOperationAST($documentNode, $op->operation);
+            $operationAST = AST::getOperationAST($documentNode, $params->operationName);
 
             if ($operationAST === null) {
                 throw new RequestError('Failed to determine operation type');
             }
 
             $operationType = $operationAST->operation;
-            if ($operationType !== 'query' && $op->readOnly) {
+            if ($operationType !== 'query' && $params->readOnly) {
                 throw new RequestError('GET supports only query operation');
             }
 
-            $context = $this->contextFactory?->createContext($op, $documentNode, $operationType);
+            $context = $this->contextFactory?->createContext($documentNode, $operationType);
+
+            $this->dispatcher->dispatch(
+                new OnExecute(
+                    $this->schema,
+                    $documentNode,
+                    $context,
+                    $params->variables,
+                    $params->operationName,
+                    $operationType
+                )
+            );
+
             $result = Executor::promiseToExecute(
                 promiseAdapter: $promiseAdapter,
                 schema: $this->schema,
                 documentNode: $documentNode,
                 contextValue: $context,
-                variableValues: $op->variables,
-                operationName: $op->operation,
+                variableValues: $params->variables,
+                operationName: $params->operationName,
             );
-        } catch (RequestError $e) {
-            $result = $promiseAdapter->createFulfilled(
-                new ExecutionResult(null, [Error::createLocatedError($e)])
-            );
-        } catch (Error $e) {
-            $result = $promiseAdapter->createFulfilled(
-                new ExecutionResult(null, [$e])
-            );
-        }
 
-        $applyErrorHandling = function (ExecutionResult $result) use ($context): ExecutionResult {
+            $result = $this->promiseAdapter->wait($result);
+
+            $this->dispatcher->dispatch(
+                new OnExecuteDone(
+                    $this->schema,
+                    $documentNode,
+                    $context,
+                    $params->variables,
+                    $params->operationName,
+                    $operationType,
+                    $result
+                )
+            );
+
             if ($context instanceof ExtensionsAwareContext) {
                 $result->extensions = $context->getExtensions();
             }
+        } catch (RequestError $e) {
+            $result = new ExecutionResult(null, [Error::createLocatedError($e)]);
+        } catch (Error $e) {
+            $result = new ExecutionResult(null, [$e]);
+        }
 
-            return $result;
-        };
-
-        return $result->then($applyErrorHandling);
+        return $result;
     }
 
-    public function validateOperationParams(OperationParams $params): array
+    /**
+     * @throws RequestError
+     */
+    public function validateOperationParams(array $params, bool $readOnly = false): OperationParams
     {
-        $errors = [];
-        $query = $params->query ?? '';
-        $queryId = $params->queryId ?? '';
-        if ($query === '' && $queryId === '') {
-            $errors[] = new RequestError(
-                'GraphQL Request must include at least one of those two parameters: "query" or "queryId"'
-            );
-        }
+        $query = $params['query'] ?? null;
+        $operationName = $params['operationName'] ?? null;
+        $variables = $params['variables'] ?? null;
+        $extensions = $params['extensions'] ?? null;
 
         if (!is_string($query)) {
-            $errors[] = new RequestError(
+            throw new RequestError(
                 'GraphQL Request parameter "query" must be string, but got '
-                .Utils::printSafeJson($params->query)
+                .Utils::printSafeJson($query)
             );
         }
 
-        if (!is_string($queryId)) {
-            $errors[] = new RequestError(
-                'GraphQL Request parameter "queryId" must be string, but got '
-                .Utils::printSafeJson($params->queryId)
-            );
-        }
-
-        if ($params->operation !== null && !is_string($params->operation)) {
-            $errors[] = new RequestError(
+        if ($operationName !== null && !is_string($operationName)) {
+            throw new RequestError(
                 'GraphQL Request parameter "operation" must be string, but got '
-                .Utils::printSafeJson($params->operation)
+                .Utils::printSafeJson($operationName)
             );
         }
 
-        if ($params->variables !== null && (!is_array($params->variables) || isset($params->variables[0]))) {
-            $errors[] = new RequestError(
+        if ($variables !== null && !is_array($variables)) {
+            throw new RequestError(
                 'GraphQL Request parameter "variables" must be object or JSON string parsed to object, but got '
-                .Utils::printSafeJson($params->originalInput['variables'])
+                .Utils::printSafeJson($variables)
             );
         }
 
-        return $errors;
+        return new OperationParams($query, $operationName, $variables, $extensions, $readOnly);
     }
 
     /**

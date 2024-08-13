@@ -6,7 +6,6 @@ namespace Arxy\GraphQL;
 
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
-use GraphQL\Server\OperationParams;
 
 /**
  * @template T
@@ -19,7 +18,6 @@ interface ContextFactoryInterface
      * @return T
      */
     public function createContext(
-        OperationParams $params,
         DocumentNode $doc,
         string $operationType
     ): mixed;
