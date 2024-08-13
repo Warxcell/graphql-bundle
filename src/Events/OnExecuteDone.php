@@ -6,16 +6,22 @@ namespace Arxy\GraphQL\Events;
 
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Language\AST\DocumentNode;
+use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Type\Schema;
 
+/**
+ * @phpstan-import-type OperationType from OperationDefinitionNode
+ */
 final readonly class OnExecuteDone
 {
     public function __construct(
         public Schema $schema,
-        public DocumentNode $node,
+        public DocumentNode $document,
         public mixed $contextValue,
         public array $variables,
         public ?string $operationName,
+        /** @var OperationType */
+        public ?string $operationType,
         ExecutionResult $result
     ) {
     }

@@ -240,7 +240,14 @@ final readonly class GraphQL
             $context = $this->contextFactory?->createContext($documentNode, $operationType);
 
             $this->dispatcher->dispatch(
-                new OnExecute($this->schema, $documentNode, $context, $params->variables, $params->operationName)
+                new OnExecute(
+                    $this->schema,
+                    $documentNode,
+                    $context,
+                    $params->variables,
+                    $params->operationName,
+                    $operationType
+                )
             );
 
             $result = Executor::promiseToExecute(
@@ -261,6 +268,7 @@ final readonly class GraphQL
                     $context,
                     $params->variables,
                     $params->operationName,
+                    $operationType,
                     $result
                 )
             );
