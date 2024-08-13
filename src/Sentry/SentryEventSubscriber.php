@@ -6,7 +6,6 @@ namespace Arxy\GraphQL\Sentry;
 
 use Arxy\GraphQL\Events\OnExecute;
 use GraphQL\Language\Printer;
-use GraphQL\Utils\Utils;
 use Sentry\State\HubInterface;
 use Sentry\State\Scope;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
