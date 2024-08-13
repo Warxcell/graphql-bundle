@@ -3,7 +3,7 @@
     "type": "bundle",
     "license": "proprietary",
     "require": {
-        "php": ">=8.1",
+        "php": ">=8.2",
         "webonyx/graphql-php": "^15.7",
         "symfony/psr-http-message-bridge": "^2.1",
         "symfony/dependency-injection": "^5.0 | ^6.0 | ^7.0",
