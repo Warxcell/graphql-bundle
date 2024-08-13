@@ -30,12 +30,12 @@ final readonly class SentryEventSubscriber implements EventSubscriberInterface
         $this->hub->configureScope(static function (Scope $scope) use ($event): void {
             $scope->setContext('GraphQL', [
                 'operationName' => $event->operationName,
-                'operationType' => $event->operationName,
+                'operationType' => $event->operationType,
             ]);
 
 
             $scope->setExtra('document', Printer::doPrint($event->document));
-            $scope->setExtra('variables', Utils::printSafeJson($event->variables));
+            $scope->setExtra('variables', $event->variables);
         });
     }
 }
