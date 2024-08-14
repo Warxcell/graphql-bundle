@@ -17,7 +17,7 @@ final readonly class OnExecute
         public Schema $schema,
         public DocumentNode $document,
         public mixed $contextValue,
-        public array $variables,
+        public ?array $variables,
         public ?string $operationName,
         /** @var OperationType */
         public ?string $operationType,
