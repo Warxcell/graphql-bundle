@@ -72,13 +72,13 @@ final class ArxyGraphQLExtension extends Extension
         $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
+        $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
 
         $queryContainerFactoryDef = $container->getDefinition(QueryContainerFactory::class);
         $queryContainerFactoryDef->setArgument('$queryCache', new Reference($config['query_cache']));
 
         $executorDef = $container->getDefinition(Executor::class);
         $executorDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
-        $executorDef->setArgument('$contextFactory', new Reference($config['context_factory']));
 
         $executionResultCache = $config['operation_execution_result_cache'] ?? null;
 
