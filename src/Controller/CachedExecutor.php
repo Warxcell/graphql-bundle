@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\OperationParams;
+use Arxy\GraphQL\QueryContainer;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
 use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
+use GraphQL\Language\Parser;
+use GraphQL\Language\Printer;
 use GraphQL\Type\Schema;
 use Psr\Cache\CacheItemPoolInterface;
 
@@ -26,9 +29,9 @@ final readonly class CachedExecutor implements ExecutorInterface
     ) {
     }
 
-    private function shouldCache(OperationDefinitionNode $operationDefinitionNode): bool
+    private function shouldCache(QueryContainer $queryContainer): bool
     {
-        foreach ($operationDefinitionNode->directives as $directive) {
+        foreach ($queryContainer->operationDefinitionNode->directives as $directive) {
             if ($directive->name->value === 'cacheQuery') {
                 return true;
             }
@@ -37,33 +40,21 @@ final readonly class CachedExecutor implements ExecutorInterface
         return false;
     }
 
-    public function execute(
-        Schema $schema,
-        SyncPromiseAdapter $promiseAdapter,
-        OperationParams $params,
-        DocumentNode $documentNode,
-        OperationDefinitionNode $operationDefinitionNode
-    ): ExecutionResult {
-        if ($this->shouldCache($operationDefinitionNode)) {
+    public function execute(QueryContainer $queryContainer): ExecutionResult
+    {
+        if ($this->shouldCache($queryContainer)) {
             $cached = $this->cache->getItem(
                 md5(
                     sprintf(
-                        'query-%s-params-%s-extensions-%s',
-                        $params->queryCacheKey,
-                        json_encode($params->variables, flags: JSON_THROW_ON_ERROR),
-                        json_encode($params->extensions, flags: JSON_THROW_ON_ERROR)
+                        'query-%s-variables-%s',
+                        $queryContainer->cacheKey,
+                        json_encode($queryContainer->variables, flags: JSON_THROW_ON_ERROR),
                     )
                 )
             );
 
             if (!$cached->isHit()) {
-                $result = $this->executor->execute(
-                    $schema,
-                    $promiseAdapter,
-                    $params,
-                    $documentNode,
-                    $operationDefinitionNode
-                );
+                $result = $this->executor->execute($queryContainer);
 
                 $cached->set($result);
                 $this->cache->save($cached);
@@ -72,6 +63,6 @@ final readonly class CachedExecutor implements ExecutorInterface
             return $cached->get();
         }
 
-        return $this->executor->execute($schema, $promiseAdapter, $params, $documentNode, $operationDefinitionNode);
+        return $this->executor->execute($queryContainer);
     }
 }

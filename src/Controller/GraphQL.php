@@ -7,33 +7,26 @@ namespace Arxy\GraphQL\Controller;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\OperationParams;
+use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\QueryError;
 use Closure;
 use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
 use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
-use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
-use GraphQL\Language\Parser;
 use GraphQL\Server\RequestError;
-use GraphQL\Type\Schema;
-use GraphQL\Utils\AST;
 use GraphQL\Utils\Utils;
-use GraphQL\Validator\DocumentValidator;
-use GraphQL\Validator\Rules\QueryComplexity;
 use JsonException;
-use Psr\Cache\CacheItemPoolInterface;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Throwable;
 
-use function assert;
 use function explode;
 use function is_array;
 use function is_string;
 use function json_decode;
 use function json_encode;
-use function md5;
 use function parse_str;
 use function str_contains;
 
@@ -46,11 +39,9 @@ final readonly class GraphQL
 
     public function __construct(
         private ExecutorInterface $executor,
-        private SyncPromiseAdapter $promiseAdapter,
+        private QueryContainerFactory $queryContainerFactory,
         bool $debug,
         ErrorsHandlerInterface $errorsHandler,
-        private Schema $schema,
-        private CacheItemPoolInterface $queryCache,
     ) {
         $this->errorFormatter = FormattedError::prepareFormatter(
             formatter: null,
@@ -88,60 +79,22 @@ final readonly class GraphQL
     {
         try {
             $params = $this->parseRequest($request);
-            $cacheItem = $this->queryCache->getItem($params->queryCacheKey);
-
-            if ($cacheItem->isHit()) {
-                $documentNode = AST::fromArray($cacheItem->get());
-            } else {
-                $documentNode = Parser::parse($params->query);
-
-                $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
-                assert(
-                    $queryComplexity instanceof QueryComplexity,
-                    'should not register a different rule for QueryComplexity'
-                );
-
-                $queryComplexity->setRawVariableValues($params->variables);
-                $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
-
-                if ($validationErrors !== []) {
-                    return $this->resultToResponse(new ExecutionResult(null, $validationErrors));
-                } else {
-                    $cacheItem->set(AST::toArray($documentNode));
-                    $this->queryCache->save($cacheItem);
-                }
-            }
-
-            $operationAST = AST::getOperationAST($documentNode, $params->operationName);
-
-            if ($operationAST === null) {
-                throw new RequestError('Failed to determine operation type');
-            }
-
-            $operationType = $operationAST->operation;
-
-            if ($operationType !== 'query' && $params->readOnly) {
-                throw new RequestError('GET supports only query operation');
-            }
-
-            $result = $this->executor->execute(
-                $this->schema,
-                $this->promiseAdapter,
-                $params,
-                $documentNode,
-                $operationAST
-            );
-
-            return $this->resultToResponse($result);
         } catch (RequestError $e) {
             return $this->resultToResponse(new ExecutionResult(null, [Error::createLocatedError($e)]));
-        } catch (Error $e) {
-            return $this->resultToResponse(new ExecutionResult(null, [$e]));
-        } catch (Throwable $throwable) {
-            return $this->resultToResponse(new ExecutionResult(null, [
-                Error::createLocatedError($throwable),
-            ]));
         }
+        try {
+            $queryContainer = $this->queryContainerFactory->create(
+                $params->query,
+                $params->operationName,
+                $params->variables
+            );
+        } catch (QueryError $error) {
+            return $this->resultToResponse(new ExecutionResult(null, $error->errors));
+        }
+
+        $result = $this->executor->execute($queryContainer);
+
+        return $this->resultToResponse($result);
     }
 
     private function resultToResponse(ExecutionResult $result): Response
@@ -288,6 +241,6 @@ final readonly class GraphQL
             );
         }
 
-        return new OperationParams($query, md5($query), $operationName, $variables, $extensions, $readOnly);
+        return new OperationParams($query, $operationName, $variables, $extensions, $readOnly);
     }
 }

@@ -13,6 +13,7 @@ use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
+use Arxy\GraphQL\QueryContainerFactory;
 use Arxy\GraphQL\Resolver;
 use Arxy\GraphQL\ResolverInterface;
 use Arxy\GraphQL\SchemaBuilder;
@@ -69,12 +70,14 @@ final class ArxyGraphQLExtension extends Extension
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
         $controllerDef = $container->getDefinition(GraphQL::class);
-        $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $debug);
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
-        $controllerDef->setArgument('$queryCache', new Reference($config['query_cache']));
+
+        $queryContainerFactoryDef = $container->getDefinition(QueryContainerFactory::class);
+        $queryContainerFactoryDef->setArgument('$queryCache', new Reference($config['query_cache']));
 
         $executorDef = $container->getDefinition(Executor::class);
+        $executorDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $executorDef->setArgument('$contextFactory', new Reference($config['context_factory']));
 
         if ($config['operation_execution_result_cache'] ?? null) {

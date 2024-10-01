@@ -8,61 +8,61 @@ use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\Events\OnExecute;
 use Arxy\GraphQL\Events\OnExecuteDone;
 use Arxy\GraphQL\ExtensionsAwareContext;
-use Arxy\GraphQL\OperationParams;
+use Arxy\GraphQL\QueryContainer;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
-use GraphQL\Language\AST\DocumentNode;
-use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Type\Schema;
 use Psr\EventDispatcher\EventDispatcherInterface;
 
 final readonly class Executor implements ExecutorInterface
 {
     public function __construct(
+        private Schema $schema,
+        private SyncPromiseAdapter $promiseAdapter,
         private EventDispatcherInterface $dispatcher,
         private ?ContextFactoryInterface $contextFactory = null,
     ) {
     }
 
-    public function execute(
-        Schema $schema,
-        SyncPromiseAdapter $promiseAdapter,
-        OperationParams $params,
-        DocumentNode $documentNode,
-        OperationDefinitionNode $operationDefinitionNode
-    ): ExecutionResult {
+    public function execute(QueryContainer $queryContainer): ExecutionResult
+    {
+        $documentNode = $queryContainer->documentNode;
+        $variables = $queryContainer->variables;
+        $operationDefinitionNode = $queryContainer->operationDefinitionNode;
+
         $operationType = $operationDefinitionNode->operation;
         $context = $this->contextFactory?->createContext($documentNode, $operationType);
 
+        $operationName = $operationDefinitionNode->name?->value;
         $this->dispatcher->dispatch(
             new OnExecute(
-                $schema,
+                $this->schema,
                 $documentNode,
                 $context,
-                $params->variables,
-                $params->operationName,
+                $variables,
+                $operationName,
                 $operationType
             )
         );
 
         $result = \GraphQL\Executor\Executor::promiseToExecute(
-            promiseAdapter: $promiseAdapter,
-            schema: $schema,
+            promiseAdapter: $this->promiseAdapter,
+            schema: $this->schema,
             documentNode: $documentNode,
             contextValue: $context,
-            variableValues: $params->variables,
-            operationName: $params->operationName,
+            variableValues: $variables,
+            operationName: $operationName,
         );
 
-        $result = $promiseAdapter->wait($result);
+        $result = $this->promiseAdapter->wait($result);
 
         $this->dispatcher->dispatch(
             new OnExecuteDone(
-                $schema,
+                $this->schema,
                 $documentNode,
                 $context,
-                $params->variables,
-                $params->operationName,
+                $variables,
+                $operationName,
                 $operationType,
                 $result
             )

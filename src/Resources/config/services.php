@@ -13,6 +13,7 @@ use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
 use Arxy\GraphQL\ErrorsHandler;
+use Arxy\GraphQL\QueryContainerFactory;
 use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\SchemaBuilder;
 use Arxy\GraphQL\Security\SecurityMiddleware;
@@ -31,6 +32,7 @@ return function (ContainerConfigurator $configurator) {
     $services->set(SchemaBuilder::class)->args([
         '$documentNodeProvider' => service(DocumentNodeProviderInterface::class),
     ]);
+
     $services->set(DocumentNodeProvider::class);
     $services->set(ErrorsHandler::class)
         ->arg('$logLevel', param('arxy.graphql.error_handler.log_level'));
@@ -42,12 +44,15 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(RequestHandler::class);
 
-    $services->set(Executor::class);
+    $services->set(QueryContainerFactory::class)
+        ->arg('$schema', service('arxy.graphql.executable_schema'));
+
+    $services->set(Executor::class)
+        ->arg('$schema', service('arxy.graphql.executable_schema'));
     $services->alias(ExecutorInterface::class, Executor::class);
 
     $services->set(GraphQL::class)
-        ->tag('controller.service_arguments')
-        ->arg('$schema', service('arxy.graphql.executable_schema'));
+        ->tag('controller.service_arguments');
 
     $services->set(CacheWarmer::class);
 
