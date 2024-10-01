@@ -4,19 +4,10 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\OperationParams;
 use Arxy\GraphQL\QueryContainer;
-use Arxy\GraphQL\Util;
 use GraphQL\Executor\ExecutionResult;
-use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
-use GraphQL\Language\AST\DocumentNode;
-use GraphQL\Language\AST\IntValueNode;
-use GraphQL\Language\AST\OperationDefinitionNode;
-use GraphQL\Language\AST\StringValueNode;
-use GraphQL\Language\Parser;
-use GraphQL\Language\Printer;
+use GraphQL\Executor\Values;
 use GraphQL\Type\Schema;
-use LogicException;
 use Psr\Cache\CacheItemPoolInterface;
 
 use function json_encode;
@@ -34,15 +25,13 @@ final readonly class CachedExecutor implements ExecutorInterface
     ) {
     }
 
-    private function shouldCache(QueryContainer $queryContainer): ?iterable
+    private function shouldCache(QueryContainer $queryContainer): ?array
     {
-        $directives = (array)Util::getDirectives(
-            $queryContainer->operationDefinitionNode->directives,
-            $this->schema,
+        return Values::getDirectiveValues(
+            $this->schema->getDirective('cacheQuery'),
+            $queryContainer->operationDefinitionNode,
             $queryContainer->variables
         );
-
-        return $directives['cacheQuery'] ?? null;
     }
 
     public function execute(QueryContainer $queryContainer): ExecutionResult
@@ -60,7 +49,6 @@ final readonly class CachedExecutor implements ExecutorInterface
             );
 
             if (!$cached->isHit()) {
-                $cache = (array)$cache;
                 $result = $this->executor->execute($queryContainer);
 
                 $cached->set($result);
