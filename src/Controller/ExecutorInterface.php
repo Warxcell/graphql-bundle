@@ -14,5 +14,5 @@ use GraphQL\Type\Schema;
 
 interface ExecutorInterface
 {
-    public function execute(QueryContainer $queryContainer): ExecutionResult;
+    public function execute(QueryContainer $queryContainer, mixed $context): ExecutionResult;
 }

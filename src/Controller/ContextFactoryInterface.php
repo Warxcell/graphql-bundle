@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Arxy\GraphQL;
+namespace Arxy\GraphQL\Controller;
 
-use GraphQL\Language\AST\DocumentNode;
+use Arxy\GraphQL\QueryContainer;
 use GraphQL\Language\AST\OperationDefinitionNode;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * @template T
@@ -14,11 +15,7 @@ use GraphQL\Language\AST\OperationDefinitionNode;
 interface ContextFactoryInterface
 {
     /**
-     * @param OperationType $operationType
      * @return T
      */
-    public function createContext(
-        DocumentNode $doc,
-        string $operationType
-    ): mixed;
+    public function createContext(QueryContainer $queryContainer, Request $request): mixed;
 }

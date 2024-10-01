@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\ContextFactoryInterface;
 use Arxy\GraphQL\Events\OnExecute;
 use Arxy\GraphQL\Events\OnExecuteDone;
 use Arxy\GraphQL\ExtensionsAwareContext;
@@ -20,18 +19,16 @@ final readonly class Executor implements ExecutorInterface
         private Schema $schema,
         private SyncPromiseAdapter $promiseAdapter,
         private EventDispatcherInterface $dispatcher,
-        private ?ContextFactoryInterface $contextFactory = null,
     ) {
     }
 
-    public function execute(QueryContainer $queryContainer): ExecutionResult
+    public function execute(QueryContainer $queryContainer, mixed $context): ExecutionResult
     {
         $documentNode = $queryContainer->documentNode;
         $variables = $queryContainer->variables;
         $operationDefinitionNode = $queryContainer->operationDefinitionNode;
 
         $operationType = $operationDefinitionNode->operation;
-        $context = $this->contextFactory?->createContext($documentNode, $operationType);
 
         $operationName = $operationDefinitionNode->name?->value;
         $this->dispatcher->dispatch(

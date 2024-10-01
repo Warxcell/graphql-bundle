@@ -42,6 +42,7 @@ final readonly class GraphQL
         private QueryContainerFactory $queryContainerFactory,
         bool $debug,
         ErrorsHandlerInterface $errorsHandler,
+        private ?ContextFactoryInterface $contextFactory = null,
     ) {
         $this->errorFormatter = FormattedError::prepareFormatter(
             formatter: null,
@@ -92,7 +93,8 @@ final readonly class GraphQL
             return $this->resultToResponse(new ExecutionResult(null, $error->errors));
         }
 
-        $result = $this->executor->execute($queryContainer);
+        $context = $this->contextFactory?->createContext($queryContainer, $request);
+        $result = $this->executor->execute($queryContainer, $context);
 
         return $this->resultToResponse($result);
     }

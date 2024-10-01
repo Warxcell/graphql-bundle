@@ -34,7 +34,7 @@ final readonly class CachedExecutor implements ExecutorInterface
         );
     }
 
-    public function execute(QueryContainer $queryContainer): ExecutionResult
+    public function execute(QueryContainer $queryContainer, mixed $context): ExecutionResult
     {
         $cache = $this->shouldCache($queryContainer);
         if ($cache) {
@@ -49,7 +49,7 @@ final readonly class CachedExecutor implements ExecutorInterface
             );
 
             if (!$cached->isHit()) {
-                $result = $this->executor->execute($queryContainer);
+                $result = $this->executor->execute($queryContainer, $context);
 
                 $cached->set($result);
                 if ($cache['ttl']) {
@@ -62,6 +62,6 @@ final readonly class CachedExecutor implements ExecutorInterface
             return $cached->get();
         }
 
-        return $this->executor->execute($queryContainer);
+        return $this->executor->execute($queryContainer, $context);
     }
 }
