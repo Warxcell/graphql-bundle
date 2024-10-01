@@ -2,4 +2,4 @@ directive @specifiedBy(url: String!) on SCALAR
 
 directive @isGranted(role: String!) on FIELD_DEFINITION
 
-directive @cacheQuery on QUERY
+directive @cacheQuery(ttl: Int) on QUERY

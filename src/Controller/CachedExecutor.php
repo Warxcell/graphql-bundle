@@ -6,13 +6,17 @@ namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\OperationParams;
 use Arxy\GraphQL\QueryContainer;
+use Arxy\GraphQL\Util;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
 use GraphQL\Language\AST\DocumentNode;
+use GraphQL\Language\AST\IntValueNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
+use GraphQL\Language\AST\StringValueNode;
 use GraphQL\Language\Parser;
 use GraphQL\Language\Printer;
 use GraphQL\Type\Schema;
+use LogicException;
 use Psr\Cache\CacheItemPoolInterface;
 
 use function json_encode;
@@ -25,24 +29,26 @@ final readonly class CachedExecutor implements ExecutorInterface
 {
     public function __construct(
         private ExecutorInterface $executor,
-        private CacheItemPoolInterface $cache
+        private CacheItemPoolInterface $cache,
+        private Schema $schema
     ) {
     }
 
-    private function shouldCache(QueryContainer $queryContainer): bool
+    private function shouldCache(QueryContainer $queryContainer): ?iterable
     {
-        foreach ($queryContainer->operationDefinitionNode->directives as $directive) {
-            if ($directive->name->value === 'cacheQuery') {
-                return true;
-            }
-        }
+        $directives = (array)Util::getDirectives(
+            $queryContainer->operationDefinitionNode->directives,
+            $this->schema,
+            $queryContainer->variables
+        );
 
-        return false;
+        return $directives['cacheQuery'] ?? null;
     }
 
     public function execute(QueryContainer $queryContainer): ExecutionResult
     {
-        if ($this->shouldCache($queryContainer)) {
+        $cache = $this->shouldCache($queryContainer);
+        if ($cache) {
             $cached = $this->cache->getItem(
                 md5(
                     sprintf(
@@ -54,9 +60,14 @@ final readonly class CachedExecutor implements ExecutorInterface
             );
 
             if (!$cached->isHit()) {
+                $cache = (array)$cache;
                 $result = $this->executor->execute($queryContainer);
 
                 $cached->set($result);
+                if ($cache['ttl']) {
+                    $cached->expiresAfter($cache['ttl']);
+                }
+
                 $this->cache->save($cached);
             }
 

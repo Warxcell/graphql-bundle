@@ -40,15 +40,15 @@ return function (ContainerConfigurator $configurator) {
     $services->set('arxy.graphql.executable_schema', Schema::class)
         ->factory([service(SchemaBuilder::class), 'makeExecutableSchema']);
 
+    $services->alias(Schema::class, 'arxy.graphql.executable_schema');
+
     $services->set(DumpSchemaCommand::class);
 
     $services->set(RequestHandler::class);
 
-    $services->set(QueryContainerFactory::class)
-        ->arg('$schema', service('arxy.graphql.executable_schema'));
+    $services->set(QueryContainerFactory::class);
 
-    $services->set(Executor::class)
-        ->arg('$schema', service('arxy.graphql.executable_schema'));
+    $services->set(Executor::class);
     $services->alias(ExecutorInterface::class, Executor::class);
 
     $services->set(GraphQL::class)
