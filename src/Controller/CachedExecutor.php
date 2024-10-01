@@ -22,7 +22,7 @@ final readonly class CachedExecutor implements ExecutorInterface
 {
     public function __construct(
         private ExecutorInterface $executor,
-        private CacheItemPoolInterface $operationResultCache
+        private CacheItemPoolInterface $cache
     ) {
     }
 
@@ -45,7 +45,7 @@ final readonly class CachedExecutor implements ExecutorInterface
         OperationDefinitionNode $operationDefinitionNode
     ): ExecutionResult {
         if ($this->shouldCache($operationDefinitionNode)) {
-            $cached = $this->operationResultCache->getItem(
+            $cached = $this->cache->getItem(
                 md5(
                     sprintf(
                         'query-%s-params-%s-extensions-%s',
@@ -66,7 +66,7 @@ final readonly class CachedExecutor implements ExecutorInterface
                 );
 
                 $cached->set($result);
-                $this->operationResultCache->save($cached);
+                $this->cache->save($cached);
             }
 
             return $cached->get();

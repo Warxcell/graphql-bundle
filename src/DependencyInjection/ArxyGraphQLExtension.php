@@ -81,7 +81,7 @@ final class ArxyGraphQLExtension extends Extension
             $cachedExecutorDef = new Definition(CachedExecutor::class);
             $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
             $cachedExecutorDef->setArgument(
-                '$operationResultCache',
+                '$cache',
                 new Reference($config['operation_execution_result_cache'])
             );
             $cachedExecutorDef->setAutoconfigured(true);
