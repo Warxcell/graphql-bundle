@@ -7,6 +7,8 @@ namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 use Arxy\GraphQL\ArgumentMapperMiddleware;
 use Arxy\GraphQL\CacheWarmer;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
+use Arxy\GraphQL\Controller\Executor;
+use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
@@ -39,6 +41,9 @@ return function (ContainerConfigurator $configurator) {
     $services->set(DumpSchemaCommand::class);
 
     $services->set(RequestHandler::class);
+
+    $services->set(Executor::class);
+    $services->alias(ExecutorInterface::class, Executor::class);
 
     $services->set(GraphQL::class)
         ->tag('controller.service_arguments')

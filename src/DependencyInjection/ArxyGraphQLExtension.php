@@ -7,6 +7,9 @@ namespace Arxy\GraphQL\DependencyInjection;
 use Arxy\GraphQL\ArgumentMapperMiddleware;
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
+use Arxy\GraphQL\Controller\CachedExecutor;
+use Arxy\GraphQL\Controller\Executor;
+use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
@@ -24,7 +27,6 @@ use Symfony\Component\DependencyInjection\Definition;
 use Symfony\Component\DependencyInjection\Extension\Extension;
 use Symfony\Component\DependencyInjection\Loader\PhpFileLoader;
 use Symfony\Component\DependencyInjection\Reference;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 final class ArxyGraphQLExtension extends Extension
 {
@@ -40,6 +42,7 @@ final class ArxyGraphQLExtension extends Extension
 
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.php');
+
         if ($debug) {
             $loader->load('services_dev.php');
         }
@@ -68,10 +71,24 @@ final class ArxyGraphQLExtension extends Extension
         $controllerDef = $container->getDefinition(GraphQL::class);
         $controllerDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $controllerDef->setArgument('$debug', $debug);
-        $controllerDef->setArgument('$contextFactory', new Reference($config['context_factory']));
         $controllerDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
         $controllerDef->setArgument('$queryCache', new Reference($config['query_cache']));
 
+        $executorDef = $container->getDefinition(Executor::class);
+        $executorDef->setArgument('$contextFactory', new Reference($config['context_factory']));
+
+        if ($config['operation_execution_result_cache'] ?? null) {
+            $cachedExecutorDef = new Definition(CachedExecutor::class);
+            $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
+            $cachedExecutorDef->setArgument(
+                '$operationResultCache',
+                new Reference($config['operation_execution_result_cache'])
+            );
+            $cachedExecutorDef->setAutoconfigured(true);
+            $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
+
+            $container->setDefinition(CachedExecutor::class, $cachedExecutorDef);
+        }
 
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
         $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);

@@ -62,6 +62,8 @@ final class Configuration implements ConfigurationInterface
                 ->scalarNode('query_cache')
                       ->isRequired()
                 ->end()
+                ->scalarNode('operation_execution_result_cache')
+                ->end()
                 ->scalarNode('cache_dir')
                     ->defaultValue('%kernel.build_dir%/arxy_graphql')
                     ->cannotBeEmpty()
