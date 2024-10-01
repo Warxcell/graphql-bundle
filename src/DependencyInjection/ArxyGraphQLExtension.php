@@ -80,13 +80,12 @@ final class ArxyGraphQLExtension extends Extension
         $executorDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $executorDef->setArgument('$contextFactory', new Reference($config['context_factory']));
 
-        if ($config['operation_execution_result_cache'] ?? null) {
+        $executionResultCache = $config['operation_execution_result_cache'] ?? null;
+
+        if ($executionResultCache) {
             $cachedExecutorDef = new Definition(CachedExecutor::class);
             $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
-            $cachedExecutorDef->setArgument(
-                '$cache',
-                new Reference($config['operation_execution_result_cache'])
-            );
+            $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
             $cachedExecutorDef->setAutoconfigured(true);
             $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
 
