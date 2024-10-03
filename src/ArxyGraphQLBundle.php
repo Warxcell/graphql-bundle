@@ -224,7 +224,6 @@ final class ArxyGraphQLBundle extends Bundle
                                             $container->getParameter('arxy.graphql.middlewares')
                                         );
 
-                                        $middlewares[] = ArgumentMapperMiddleware::class;
                                         $middlewares[] = SecurityMiddleware::class;
                                         if ($debug) {
                                             $middlewares[] = TimingMiddleware::class;

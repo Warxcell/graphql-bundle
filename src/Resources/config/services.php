@@ -57,5 +57,4 @@ return function (ContainerConfigurator $configurator) {
     $services->set(CacheWarmer::class);
 
     $services->set(SecurityMiddleware::class);
-    $services->set(ArgumentMapperMiddleware::class);
 };

@@ -2,9 +2,15 @@
   "name": "arxy/graphql-bundle",
   "type": "bundle",
   "license": "proprietary",
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/Warxcell/graphql-php"
+    }
+  ],
   "require": {
     "php": ">=8.2",
-    "webonyx/graphql-php": "^15.7",
+    "webonyx/graphql-php": "dev-patched",
     "symfony/psr-http-message-bridge": "^2.1",
     "symfony/dependency-injection": "^5.0 | ^6.0 | ^7.0",
     "psr/http-factory": "^1.0",
