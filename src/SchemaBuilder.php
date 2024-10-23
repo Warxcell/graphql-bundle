@@ -180,6 +180,10 @@ final class SchemaBuilder
             $argumentsMapping,
             $validator
         ) {
+            if (!$node instanceof ObjectTypeDefinitionNode && !$node instanceof ObjectTypeExtensionNode) {
+                return $typeConfig;
+            }
+
             $resolver = $resolvers[$node->name->value][$fieldDefinitionNode->name->value];
             $typeConfig['resolve'] = $resolver;
 
