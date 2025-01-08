@@ -23,16 +23,7 @@ final class ErrorsHandler implements ErrorsHandlerInterface
         $formatted = [];
         foreach ($errors as $error) {
             if (!($error instanceof ClientAware && $error->isClientSafe())) {
-                $message = sprintf(
-                    '[GraphQL] "%s": "%s"[%d] at "%s" line "%s".',
-                    $error::class,
-                    $error->getMessage(),
-                    $error->getCode(),
-                    $error->getFile(),
-                    $error->getLine()
-                );
-
-                $this->logger->log($this->logLevel, $message, ['exception' => $error]);
+                $this->logger->log($this->logLevel, $error->getMessage(), ['exception' => $error]);
             }
 
             $formatted[] = $formatter($error);
