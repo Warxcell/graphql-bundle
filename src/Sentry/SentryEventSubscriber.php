@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Sentry;
 
 use Arxy\GraphQL\Events\OnExecute;
-use GraphQL\Language\Printer;
 use Sentry\State\HubInterface;
 use Sentry\State\Scope;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -32,8 +31,7 @@ final readonly class SentryEventSubscriber implements EventSubscriberInterface
                 'operationType' => $event->operationType,
             ]);
 
-
-            $scope->setExtra('document', Printer::doPrint($event->document));
+            $scope->setExtra('document', $event->query);
             $scope->setExtra('variables', $event->variables);
         });
     }

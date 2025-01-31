@@ -35,6 +35,7 @@ final readonly class Executor implements ExecutorInterface
             new OnExecute(
                 $this->schema,
                 $documentNode,
+                $queryContainer->query,
                 $context,
                 $variables,
                 $operationName,

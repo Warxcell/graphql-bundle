@@ -16,6 +16,7 @@ final readonly class OnExecute
     public function __construct(
         public Schema $schema,
         public DocumentNode $document,
+        public string $query,
         public mixed $contextValue,
         public ?array $variables,
         public ?string $operationName,
