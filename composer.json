@@ -2,12 +2,6 @@
   "name": "arxy/graphql-bundle",
   "type": "bundle",
   "license": "proprietary",
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "https://github.com/Warxcell/graphql-php"
-    }
-  ],
   "require": {
     "php": ">=8.2",
     "webonyx/graphql-php": "^15.19",
