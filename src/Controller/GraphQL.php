@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\ErrorsHandlerInterface;
-use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\OperationParams;
 use Arxy\GraphQL\QueryContainerFactory;
 use Arxy\GraphQL\QueryError;
-use Closure;
-use GraphQL\Error\DebugFlag;
 use GraphQL\Error\Error;
-use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Server\RequestError;
 use GraphQL\Utils\Utils;
@@ -20,7 +15,6 @@ use JsonException;
 use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Throwable;
 
 use function explode;
 use function is_array;
@@ -34,42 +28,12 @@ use const JSON_THROW_ON_ERROR;
 
 final readonly class GraphQL
 {
-    private Closure $errorFormatter;
-    private Closure $errorsHandler;
-
     public function __construct(
         private ExecutorInterface $executor,
         private QueryContainerFactory $queryContainerFactory,
-        bool $debug,
-        ErrorsHandlerInterface $errorsHandler,
         private ?ContextFactoryInterface $contextFactory = null,
     ) {
-        $this->errorFormatter = FormattedError::prepareFormatter(
-            formatter: null,
-            debug: $debug ? DebugFlag::INCLUDE_TRACE | DebugFlag::INCLUDE_DEBUG_MESSAGE : DebugFlag::NONE
-        );
 
-        $this->errorsHandler = function (
-            array $errors,
-            callable $formatter
-        ) use ($errorsHandler): array {
-            return $errorsHandler->handleErrors($errors, static function (Throwable $error) use (
-                $formatter
-            ): array {
-                $formatted = $formatter($error);
-
-                $previous = $error->getPrevious();
-
-                if ($previous instanceof ExceptionInterface) {
-                    $formatted['extensions'] = [
-                        ...($formatted['extensions'] ?? []),
-                        'category' => $previous->getCategory(),
-                    ];
-                }
-
-                return $formatted;
-            });
-        };
     }
 
     /**
@@ -101,9 +65,6 @@ final readonly class GraphQL
 
     private function resultToResponse(ExecutionResult $result): Response
     {
-        $result->setErrorsHandler($this->errorsHandler);
-        $result->setErrorFormatter($this->errorFormatter);
-
         $content = json_encode($result, JSON_THROW_ON_ERROR);
 
         return $this->createResponse($content);
