@@ -18,7 +18,6 @@ final readonly class Executor implements ExecutorInterface
     public function __construct(
         private Schema $schema,
         private SyncPromiseAdapter $promiseAdapter,
-        private EventDispatcherInterface $dispatcher,
     ) {
     }
 
@@ -27,21 +26,7 @@ final readonly class Executor implements ExecutorInterface
         $documentNode = $queryContainer->documentNode;
         $variables = $queryContainer->variables;
         $operationDefinitionNode = $queryContainer->operationDefinitionNode;
-
-        $operationType = $operationDefinitionNode->operation;
-
         $operationName = $operationDefinitionNode->name?->value;
-        $this->dispatcher->dispatch(
-            new OnExecute(
-                $this->schema,
-                $documentNode,
-                $queryContainer->query,
-                $context,
-                $variables,
-                $operationName,
-                $operationType
-            )
-        );
 
         $result = \GraphQL\Executor\Executor::promiseToExecute(
             promiseAdapter: $this->promiseAdapter,
@@ -53,18 +38,6 @@ final readonly class Executor implements ExecutorInterface
         );
 
         $result = $this->promiseAdapter->wait($result);
-
-        $this->dispatcher->dispatch(
-            new OnExecuteDone(
-                $this->schema,
-                $documentNode,
-                $context,
-                $variables,
-                $operationName,
-                $operationType,
-                $result
-            )
-        );
 
         if ($context instanceof ExtensionsAwareContext) {
             $result->extensions = $context->getExtensions();

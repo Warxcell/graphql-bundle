@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Symfony\Component\DependencyInjection\Loader\Configurator;
 
-use Arxy\GraphQL\Sentry\SentryEventSubscriber;
+use Arxy\GraphQL\Controller\ExecutorInterface;
+use Arxy\GraphQL\Sentry\SentryMiddleware;
 
 return function (ContainerConfigurator $configurator) {
     $services = $configurator->services()
@@ -12,5 +13,9 @@ return function (ContainerConfigurator $configurator) {
         ->autowire()
         ->autoconfigure();
 
-    $services->set(SentryEventSubscriber::class);
+    $services->set(SentryMiddleware::class)
+        ->decorate(ExecutorInterface::class)
+        ->args([
+            '$executor' => service('.inner'),
+        ]);;
 };
