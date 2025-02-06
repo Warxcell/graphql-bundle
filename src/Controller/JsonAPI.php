@@ -93,8 +93,7 @@ final readonly class JsonAPI
             Visitor::visit($documentNode, [
                 'enter' => [
                     NodeKind::OPERATION_DEFINITION => function (OperationDefinitionNode $definitionNode) use (
-                        &
-                        $operationType
+                        &$operationType
                     ) {
                         $operationType = $definitionNode->operation;
                     },
