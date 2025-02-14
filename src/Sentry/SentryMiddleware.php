@@ -10,10 +10,16 @@ use GraphQL\Executor\ExecutionResult;
 use Sentry\State\HubInterface;
 use Sentry\State\Scope;
 
+/**
+ * @implements ExecutorInterface<mixed>
+ */
 final readonly class SentryMiddleware implements ExecutorInterface
 {
     public function __construct(
         private HubInterface $hub,
+        /**
+         * @var ExecutorInterface<mixed>
+         */
         private ExecutorInterface $executor
     ) {
     }

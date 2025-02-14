@@ -16,9 +16,13 @@ use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
+/**
+ * @implements ExecutorInterface<mixed>
+ */
 final readonly class CachedExecutor implements ExecutorInterface
 {
     public function __construct(
+        /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
         private CacheItemPoolInterface $cache,
         private Schema $schema

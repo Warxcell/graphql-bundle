@@ -29,6 +29,7 @@ use const JSON_THROW_ON_ERROR;
 final readonly class GraphQL
 {
     public function __construct(
+        /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
         private QueryContainerFactory $queryContainerFactory,
         private ?ContextFactoryInterface $contextFactory = null,

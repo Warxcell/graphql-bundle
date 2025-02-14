@@ -31,6 +31,7 @@ final readonly class JsonAPI
     private array $mutations;
 
     public function __construct(
+        /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
         private QueryContainerFactory $queryContainerFactory,
         string $queriesDirectory,

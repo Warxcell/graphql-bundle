@@ -12,7 +12,13 @@ use GraphQL\Language\AST\DocumentNode;
 use GraphQL\Language\AST\OperationDefinitionNode;
 use GraphQL\Type\Schema;
 
+/**
+ * @template T
+ */
 interface ExecutorInterface
 {
+    /**
+     * @param T $context
+     */
     public function execute(QueryContainer $queryContainer, mixed $context): ExecutionResult;
 }

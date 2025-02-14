@@ -16,9 +16,11 @@ use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
 use GraphQL\Type\Schema;
-use Psr\EventDispatcher\EventDispatcherInterface;
 use Throwable;
 
+/**
+ * @implements ExecutorInterface<mixed>
+ */
 final readonly class Executor implements ExecutorInterface
 {
     private Closure $errorFormatter;
