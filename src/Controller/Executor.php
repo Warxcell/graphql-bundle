@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\ErrorsHandlerInterface;
-use Arxy\GraphQL\Events\OnExecute;
-use Arxy\GraphQL\Events\OnExecuteDone;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
 use Arxy\GraphQL\QueryContainer;
