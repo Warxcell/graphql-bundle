@@ -72,7 +72,7 @@ final readonly class Executor implements ExecutorInterface
             documentNode: $documentNode,
             rootValue: null,
             contextValue: $context,
-            variableValues: $variables,
+            variableValues: $variables ?? [],
             operationName: $operationName,
             fieldResolver: \GraphQL\Executor\Executor::getDefaultFieldResolver(),
             argsMapper: \GraphQL\Executor\Executor::getDefaultArgsMapper(),
