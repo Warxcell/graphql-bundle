@@ -7,6 +7,7 @@ namespace Arxy\GraphQL\Controller;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
+use Arxy\GraphQL\GraphQL\OptimizedExecutor;
 use Arxy\GraphQL\QueryContainer;
 use Closure;
 use GraphQL\Error\DebugFlag;
@@ -65,15 +66,19 @@ final readonly class Executor implements ExecutorInterface
         $operationDefinitionNode = $queryContainer->operationDefinitionNode;
         $operationName = $operationDefinitionNode->name?->value;
 
-        $result = \GraphQL\Executor\Executor::promiseToExecute(
+        $executor = OptimizedExecutor::create(
             promiseAdapter: $this->promiseAdapter,
             schema: $this->schema,
             documentNode: $documentNode,
+            rootValue: null,
             contextValue: $context,
             variableValues: $variables,
             operationName: $operationName,
+            fieldResolver: \GraphQL\Executor\Executor::getDefaultFieldResolver(),
+            argsMapper: \GraphQL\Executor\Executor::getDefaultArgsMapper(),
         );
 
+        $result = $executor->doExecute();
         $result = $this->promiseAdapter->wait($result);
 
         $result->setErrorsHandler($this->errorsHandler);
