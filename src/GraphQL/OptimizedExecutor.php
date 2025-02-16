@@ -1121,8 +1121,8 @@ class OptimizedExecutor implements ExecutorImplementation
             $completedItems[] = $completedItem;
         }
 
-        // if one (last) contains promise - they should all contains promise anyway
-        $containsPromise = $this->getPromise($completedItem) !== null;
+        // if one contains promises - they all will be
+        $containsPromise = $completedItems !== [] && $this->getPromise($completedItems[0]) !== null;
 
         return $containsPromise
             ? $this->exeContext->promiseAdapter->all($completedItems)
