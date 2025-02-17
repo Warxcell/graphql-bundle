@@ -6,7 +6,6 @@ namespace Arxy\GraphQL\GraphQL;
 
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
-use GraphQL\Error\Warning;
 use GraphQL\Executor\ExecutionContext;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Executor;
@@ -26,7 +25,6 @@ use GraphQL\Language\AST\SelectionSetNode;
 use GraphQL\Type\Definition\AbstractType;
 use GraphQL\Type\Definition\Directive;
 use GraphQL\Type\Definition\FieldDefinition;
-use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\LeafType;
 use GraphQL\Type\Definition\ListOfType;
 use GraphQL\Type\Definition\NamedType;
