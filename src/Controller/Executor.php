@@ -15,7 +15,6 @@ use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
 use GraphQL\Type\Schema;
-use Psr\Cache\CacheItemPoolInterface;
 use Throwable;
 
 /**
@@ -30,8 +29,7 @@ final readonly class Executor implements ExecutorInterface
         private Schema $schema,
         private SyncPromiseAdapter $promiseAdapter,
         ErrorsHandlerInterface $errorsHandler,
-        bool $debug,
-        private ?CacheItemPoolInterface $cache,
+        bool $debug
     ) {
         $this->errorFormatter = FormattedError::prepareFormatter(
             formatter: null,
@@ -78,7 +76,6 @@ final readonly class Executor implements ExecutorInterface
             operationName: $operationName,
             fieldResolver: \GraphQL\Executor\Executor::getDefaultFieldResolver(),
             argsMapper: \GraphQL\Executor\Executor::getDefaultArgsMapper(),
-            cache: $this->cache
         );
 
         $result = $executor->doExecute();

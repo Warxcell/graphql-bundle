@@ -21,6 +21,7 @@ use ReflectionClass;
 use Reflector;
 use Sentry\State\HubInterface;
 use Symfony\Component\Config\FileLocator;
+use Symfony\Component\DependencyInjection\Argument\ServiceLocatorArgument;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;
@@ -40,7 +41,7 @@ final class ArxyGraphQLExtension extends Extension
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
-        $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
         $loader->load('services.php');
 
         if ($debug) {
@@ -54,7 +55,7 @@ final class ArxyGraphQLExtension extends Extension
         }
 
         $schemas = $config['schema'];
-        $schemas[] = __DIR__.'/../Resources/graphql/schema.graphql';
+        $schemas[] = __DIR__ . '/../Resources/graphql/schema.graphql';
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
         $schemaBuilderDef->setArgument('$debug', $debug);
 
@@ -64,6 +65,13 @@ final class ArxyGraphQLExtension extends Extension
         $executableSchemaBuilderDef->setArgument('$enumsMapping', $config['enums_mapping']);
         $executableSchemaBuilderDef->setArgument('$inputObjectsMapping', $config['input_objects_mapping']);
         $executableSchemaBuilderDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
+
+        $cacheResolvers = [];
+        foreach ($config['cache_resolvers'] as $objectName => $cacheResolver) {
+            $cacheResolvers[$objectName] = new Reference($cacheResolver);
+        }
+
+        $executableSchemaBuilderDef->setArgument('$cacheResolvers', new ServiceLocatorArgument($cacheResolvers));
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
@@ -102,15 +110,15 @@ final class ArxyGraphQLExtension extends Extension
         if (!$debug) {
             $cachedDocumentNodeProvider = new Definition(CachedDocumentNodeProvider::class);
             $cachedDocumentNodeProvider->setArgument('$documentNodeProvider', new Reference('.inner'));
-            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'].'/schema.php');
+            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'] . '/schema.php');
             $cachedDocumentNodeProvider->setDecoratedService(DocumentNodeProvider::class);
             $container->setDefinition(CachedDocumentNodeProvider::class, $cachedDocumentNodeProvider);
         }
 
         $container->registerAttributeForAutoconfiguration(Resolver::class, static function (
             ChildDefinition $definition,
-            Resolver $resolver,
-            Reflector $reflection
+            Resolver        $resolver,
+            Reflector       $reflection
         ): void {
             if (!$reflection instanceof ReflectionClass) {
                 return;

@@ -27,6 +27,7 @@ use GraphQL\Utils\ASTDefinitionBuilder;
 use GraphQL\Utils\BuildSchema;
 use GraphQL\Utils\SchemaExtender;
 
+use Symfony\Component\DependencyInjection\ServiceLocator;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 use function assert;
@@ -87,6 +88,7 @@ final class SchemaBuilder
 
     /**
      * @param array<string, array<string, callable(): mixed>|object{resolve: callable(): mixed}|object{resolveType: callable(): string}> $resolvers
+     * @param array<string, array<string, callable(): mixed>> $cacheResolvers
      * @param array<string, class-string> $inputObjectsMapping
      * @param array<string, class-string<BackedEnum>> $enumsMapping
      * @param array<string, array<string, class-string>> $argumentsMapping
@@ -95,6 +97,7 @@ final class SchemaBuilder
      */
     public function makeExecutableSchema(
         array $resolvers,
+        ServiceLocator $cacheResolvers,
         array $inputObjectsMapping,
         array $enumsMapping,
         ValidatorInterface $validator,
@@ -177,6 +180,7 @@ final class SchemaBuilder
             ObjectTypeDefinitionNode|ObjectTypeExtensionNode|InterfaceTypeDefinitionNode|InterfaceTypeExtensionNode $node
         ) use (
             $resolvers,
+            $cacheResolvers,
             $argumentsMapping,
             $validator
         ) {
@@ -187,6 +191,10 @@ final class SchemaBuilder
             $resolver = $resolvers[$node->name->value][$fieldDefinitionNode->name->value];
             $typeConfig['resolve'] = $resolver;
 
+            $cacheResolver = $cacheResolvers->has($node->name->value) ? $cacheResolvers->get($node->name->value) : null;
+            if ($cacheResolver && method_exists($cacheResolver, $fieldDefinitionNode->name->value)) {
+                $typeConfig['cacheResolver'] = [$cacheResolver, $fieldDefinitionNode->name->value];
+            }
 
             $class = $argumentsMapping[$node->name->value][$fieldDefinitionNode->name->value];
             $typeConfig['argsMapper'] = function (array $args) use ($class, $validator) {

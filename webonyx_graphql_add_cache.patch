@@ -1,0 +1,37 @@
+diff -crB vendor/webonyx/graphql-php/src/Type/Definition/FieldDefinition.php vendor/webonyx/graphql-php-patched/src/Type/Definition/FieldDefinition.php
+*** vendor/webonyx/graphql-php/src/Type/Definition/FieldDefinition.php	2024-12-19 12:52:18.000000000 +0200
+--- vendor/webonyx/graphql-php-patched/src/Type/Definition/FieldDefinition.php	2025-02-17 09:34:56.962724000 +0200
+***************
+*** 77,82 ****
+--- 77,84 ----
+       */
+      public $resolveFn;
+  
++     public $cacheResolver;
++ 
+      public ?string $description;
+  
+      /**
+***************
+*** 112,117 ****
+--- 114,120 ----
+      {
+          $this->name = $config['name'];
+          $this->resolveFn = $config['resolve'] ?? null;
++         $this->cacheResolver = $config['cacheResolver'] ?? null;
+          $this->args = isset($config['args'])
+              ? Argument::listFromConfig($config['args'])
+              : [];
+diff -crB vendor/webonyx/graphql-php/src/Utils/SchemaExtender.php vendor/webonyx/graphql-php-patched/src/Utils/SchemaExtender.php
+*** vendor/webonyx/graphql-php/src/Utils/SchemaExtender.php	2024-12-19 12:52:18.000000000 +0200
+--- vendor/webonyx/graphql-php-patched/src/Utils/SchemaExtender.php	2025-02-17 09:35:44.109543000 +0200
+***************
+*** 503,508 ****
+--- 503,509 ----
+                  'type' => $this->extendType($field->getType()),
+                  'args' => $this->extendArgs($field->args),
+                  'resolve' => $field->resolveFn,
++                 'cacheResolver' => $field->cacheResolver,
+                  'argsMapper' => $field->argsMapper,
+                  'astNode' => $field->astNode,
+              ];

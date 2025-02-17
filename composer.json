@@ -34,5 +34,12 @@
     "psr-4": {
       "Arxy\\GraphQL\\Tests\\": "tests/"
     }
+  },
+  "extra": {
+    "patches": {
+      "webonyx/graphql-php": {
+        "add_cache": "webonyx_graphql_add_cache.patch"
+      }
+    }
   }
 }

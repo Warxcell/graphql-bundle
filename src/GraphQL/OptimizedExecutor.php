@@ -78,7 +78,7 @@ class OptimizedExecutor implements ExecutorImplementation
      */
     protected \SplObjectStorage $fieldArgsCache;
 
-    protected function __construct(ExecutionContext $context, protected readonly ?CacheItemPoolInterface $cache)
+    protected function __construct(ExecutionContext $context)
     {
         if (!isset(static::$UNDEFINED)) {
             static::$UNDEFINED = Utils::undefined();
@@ -108,9 +108,9 @@ class OptimizedExecutor implements ExecutorImplementation
         array $variableValues,
         ?string $operationName,
         callable $fieldResolver,
-        ?callable $argsMapper = null, // TODO make non-optional in next major release,
-        ?CacheItemPoolInterface $cache
-    ): ExecutorImplementation {
+        ?callable $argsMapper = null, // TODO make non-optional in next major release
+    ): ExecutorImplementation
+    {
         $exeContext = static::buildExecutionContext(
             $schema,
             $documentNode,
@@ -141,7 +141,7 @@ class OptimizedExecutor implements ExecutorImplementation
             };
         }
 
-        return new static($exeContext, $cache);
+        return new static($exeContext);
     }
 
     /**
@@ -694,12 +694,14 @@ class OptimizedExecutor implements ExecutorImplementation
             $unaliasedPath
         );
 
-        $cacheFn = $fieldDef->cacheFn;
-
         // Build a map of arguments from the field.arguments AST, using the
         // variables scope to fulfill any variable references.
         // @phpstan-ignore-next-line generics of SplObjectStorage are not inferred from empty instantiation
         $this->fieldArgsCache[$fieldDef] ??= new \SplObjectStorage();
+
+        $argsMapper = $fieldDef->argsMapper
+            ?? $parentType->argsMapper
+            ?? $this->exeContext->argsMapper;
 
         $args = $this->fieldArgsCache[$fieldDef][$fieldNode] ??= $argsMapper(
             Values::getArgumentValues(
@@ -712,17 +714,15 @@ class OptimizedExecutor implements ExecutorImplementation
             $contextValue
         );
 
-        if ($this->cache && $cacheFn && null !== ($cache = $cacheFn($rootValue, $args, $contextValue, $info))) {
-            $key = $this->cache->getItem($cache);
+        $cacheItem = null;
+        if (null !== $fieldDef->cacheResolver) {
+            $cacheItem = ($fieldDef->cacheResolver)($rootValue, $args, $contextValue, $info);
         }
 
         $resolveFn = $fieldDef->resolveFn
             ?? $parentType->resolveFieldFn
             ?? $this->exeContext->fieldResolver;
 
-        $argsMapper = $fieldDef->argsMapper
-            ?? $parentType->argsMapper
-            ?? $this->exeContext->argsMapper;
 
         // Get the resolve function, regardless of if its result is normal
         // or abrupt (error).
@@ -739,7 +739,8 @@ class OptimizedExecutor implements ExecutorImplementation
             $path,
             $unaliasedPath,
             $result,
-            $contextValue
+            $contextValue,
+            $cacheItem
         );
     }
 

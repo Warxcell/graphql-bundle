@@ -75,6 +75,10 @@ final class Configuration implements ConfigurationInterface
                     ->defaultValue('webonyx_graphql.sync_promise_adapter')
                     ->cannotBeEmpty()
                 ->end()
+                ->arrayNode('cache_resolvers')
+                    ->useAttributeAsKey('__object')
+                    ->scalarPrototype()
+                ->end()
             ->end();
         // @formatter:on
         return $treeBuilder;
