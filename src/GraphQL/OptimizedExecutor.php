@@ -1114,6 +1114,7 @@ class OptimizedExecutor implements ExecutorImplementation
         $itemType = $returnType->getWrappedType();
 
         $i = 0;
+        $containsPromise = false;
         $completedItems = [];
         foreach ($results as $item) {
             $itemPath = [...$path, $i];
@@ -1132,11 +1133,12 @@ class OptimizedExecutor implements ExecutorImplementation
                 $contextValue
             );
 
+            if (!$containsPromise && $this->getPromise($completedItem) !== null) {
+                $containsPromise = true;
+            }
+
             $completedItems[] = $completedItem;
         }
-
-        // if one contains promises - they all will be
-        $containsPromise = $completedItems !== [] && $this->getPromise($completedItems[0]) !== null;
 
         return $containsPromise
             ? $this->exeContext->promiseAdapter->all($completedItems)
