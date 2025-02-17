@@ -6,7 +6,6 @@ namespace Arxy\GraphQL\GraphQL;
 
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
-use GraphQL\Error\Warning;
 use GraphQL\Executor\ExecutionContext;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Executor;
@@ -26,7 +25,6 @@ use GraphQL\Language\AST\SelectionSetNode;
 use GraphQL\Type\Definition\AbstractType;
 use GraphQL\Type\Definition\Directive;
 use GraphQL\Type\Definition\FieldDefinition;
-use GraphQL\Type\Definition\InterfaceType;
 use GraphQL\Type\Definition\LeafType;
 use GraphQL\Type\Definition\ListOfType;
 use GraphQL\Type\Definition\NamedType;
@@ -1207,72 +1205,6 @@ class OptimizedExecutor implements ExecutorImplementation
     }
 
     /**
-     * If a resolveType function is not given, then a default resolve behavior is
-     * used which attempts two strategies:.
-     *
-     * First, See if the provided value has a `__typename` field defined, if so, use
-     * that value as name of the resolved type.
-     *
-     * Otherwise, test each possible type for the abstract type by calling
-     * isTypeOf for the object being coerced, returning the first type that matches.
-     *
-     * @param mixed|null $value
-     * @param mixed|null $contextValue
-     * @param AbstractType&Type $abstractType
-     *
-     * @return Promise|Type|string|null
-     * @throws InvariantViolation
-     *
-     */
-    protected function defaultTypeResolver($value, $contextValue, ResolveInfo $info, AbstractType $abstractType)
-    {
-        $typename = Utils::extractKey($value, '__typename');
-        if (\is_string($typename)) {
-            return $typename;
-        }
-
-        if ($abstractType instanceof InterfaceType && isset($info->schema->getConfig()->typeLoader)) {
-            $safeValue = Utils::printSafe($value);
-            Warning::warnOnce(
-                "GraphQL Interface Type `{$abstractType->name}` returned `null` from its `resolveType` function for value: {$safeValue}. Switching to slow resolution method using `isTypeOf` of all possible implementations. It requires full schema scan and degrades query performance significantly. Make sure your `resolveType` function always returns a valid implementation or throws.",
-                Warning::WARNING_FULL_SCHEMA_SCAN
-            );
-        }
-
-        $possibleTypes = $info->schema->getPossibleTypes($abstractType);
-        $promisedIsTypeOfResults = [];
-        foreach ($possibleTypes as $index => $type) {
-            $isTypeOfResult = $type->isTypeOf($value, $contextValue, $info);
-            if ($isTypeOfResult === null) {
-                continue;
-            }
-
-            $promise = $this->getPromise($isTypeOfResult);
-            if ($promise !== null) {
-                $promisedIsTypeOfResults[$index] = $promise;
-            } elseif ($isTypeOfResult === true) {
-                return $type;
-            }
-        }
-
-        if ($promisedIsTypeOfResults !== []) {
-            return $this->exeContext->promiseAdapter
-                ->all($promisedIsTypeOfResults)
-                ->then(static function ($isTypeOfResults) use ($possibleTypes): ?ObjectType {
-                    foreach ($isTypeOfResults as $index => $result) {
-                        if ($result) {
-                            return $possibleTypes[$index];
-                        }
-                    }
-
-                    return null;
-                });
-        }
-
-        return null;
-    }
-
-    /**
      * Complete an Object value by executing all sub-selections.
      *
      * @param \ArrayObject<int, FieldNode> $fieldNodes
@@ -1302,23 +1234,6 @@ class OptimizedExecutor implements ExecutorImplementation
             $unaliasedPath,
             $result,
             $contextValue
-        );
-    }
-
-    /**
-     * @param \ArrayObject<int, FieldNode> $fieldNodes
-     * @param array<mixed> $result
-     */
-    protected function invalidReturnTypeError(
-        ObjectType $returnType,
-        $result,
-        \ArrayObject $fieldNodes
-    ): Error {
-        $safeResult = Utils::printSafe($result);
-
-        return new Error(
-            "Expected value of type \"{$returnType->name}\" but got: {$safeResult}.",
-            $fieldNodes
         );
     }
 

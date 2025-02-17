@@ -45,25 +45,38 @@ final readonly class CachedExecutor implements ExecutorInterface
             $cached = $this->cache->getItem(
                 md5(
                     sprintf(
-                        'query-%s-variables-%s',
+                        'query=%s|variables=%s',
                         $queryContainer->cacheKey,
                         json_encode($queryContainer->variables, flags: JSON_THROW_ON_ERROR),
                     )
                 )
             );
 
-            if (!$cached->isHit()) {
-                $result = $this->executor->execute($queryContainer, $context);
+            if ($cached->isHit()) {
+                $value = $cached->get();
 
-                $cached->set($result);
-                if ($cache['ttl']) {
-                    $cached->expiresAfter($cache['ttl']);
-                }
-
-                $this->cache->save($cached);
+                return new ExecutionResult(
+                    data: $value['data'],
+                    errors: $value['errors'],
+                    extensions: $value['extensions'],
+                );
             }
 
-            return $cached->get();
+            $result = $this->executor->execute($queryContainer, $context);
+
+            $cached->set([
+                'data' => $result->data,
+                'errors' => $result->errors,
+                'extensions' => $result->extensions,
+            ]);
+
+            if ($cache['ttl']) {
+                $cached->expiresAfter($cache['ttl']);
+            }
+
+            $this->cache->save($cached);
+
+            return $result;
         }
 
         return $this->executor->execute($queryContainer, $context);
