@@ -6,7 +6,6 @@ namespace Arxy\GraphQL\GraphQL;
 
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
-use GraphQL\Executor\ExecutionContext;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Executor;
 use GraphQL\Executor\ExecutorImplementation;
@@ -31,7 +30,6 @@ use GraphQL\Type\Definition\NamedType;
 use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\OutputType;
-use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Introspection;
 use GraphQL\Type\Schema;
@@ -39,7 +37,6 @@ use GraphQL\Type\SchemaValidationContext;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\Utils;
 use Psr\Cache\CacheItemInterface;
-use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * @phpstan-import-type FieldResolver from Executor
@@ -239,6 +236,7 @@ class OptimizedExecutor implements ExecutorImplementation
             $contextValue,
             $operation,
             $variableValues,
+            $rawVariableValues,
             $errors,
             $fieldResolver,
             $argsMapper,
@@ -689,6 +687,7 @@ class OptimizedExecutor implements ExecutorImplementation
             $exeContext->rootValue,
             $exeContext->operation,
             $exeContext->variableValues,
+            $exeContext->rawVariableValues,
             $unaliasedPath
         );
 
