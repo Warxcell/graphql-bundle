@@ -36,6 +36,5 @@ class ResolveInfo extends \GraphQL\Type\Definition\ResolveInfo
             $variableValues,
             $unaliasedPath
         );
-        $this->variableValues = $variableValues;
     }
 }
