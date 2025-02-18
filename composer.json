@@ -41,5 +41,12 @@
     "allow-plugins": {
       "cweagans/composer-patches": true
     }
+  },
+  "extra": {
+    "patches": {
+      "webonyx/graphql-php": {
+        "add_cache": "webonyx_graphql_add_cache.patch"
+      }
+    }
   }
 }
