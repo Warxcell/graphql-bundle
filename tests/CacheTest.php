@@ -117,24 +117,26 @@ type Object2 {
 
         $queryContainerFactory = new QueryContainerFactory($schema, new ArrayAdapter());
 
-        $queryContainer = $queryContainerFactory->create(
-        /** @lang GraphQL */ '
-{
+        $query = /** @lang GraphQL */
+            '
+query ($arg1: String){
     objects1 {
         id
         subObjects2 {
             id
-            fieldWithArgs(arg1: "ARG1")
+            fieldWithArgs(arg1: $arg1)
         }
     }
-}',
+}';
+        $queryContainer = $queryContainerFactory->create(
+            query: $query,
             operationName: null,
-            variables: []
+            variables: [
+                'arg1' => 'ARG1',
+            ]
         );
 
-
         $result = $executor->execute($queryContainer, null);
-
         foreach ($result->errors as $error) {
             throw $error;
         }
@@ -171,7 +173,24 @@ type Object2 {
         ];
         self::assertEquals($expected, $result->data);
 
+        self::assertEquals([
+            'Query' => [
+                'objects1' => 1,
+            ],
+            'Object1' => [
+                'id' => 2,
+                'subObjects2' => 2,
+            ],
+            'Object2' => [
+                'id' => 4,
+                'fieldWithArgs' => 4,
+            ],
+        ], $resolversCalled);
+
         $result = $executor->execute($queryContainer, null);
+        foreach ($result->errors as $error) {
+            throw $error;
+        }
 
         self::assertEquals($expected, $result->data);
 
@@ -186,6 +205,67 @@ type Object2 {
             'Object2' => [
                 'id' => 4,
                 'fieldWithArgs' => 4,
+            ],
+        ], $resolversCalled);
+
+
+        // Test if changing arg in sub-graph invalidates query
+        $queryContainer = $queryContainerFactory->create(
+            query: $query,
+            operationName: null,
+            variables: [
+                'arg1' => null,
+            ]
+        );
+        $result = $executor->execute($queryContainer, null);
+        foreach ($result->errors as $error) {
+            throw $error;
+        }
+
+        self::assertEquals([
+            'Query' => [
+                'objects1' => 3,
+            ],
+            'Object1' => [
+                'id' => 6,
+                'subObjects2' => 4,
+            ],
+            'Object2' => [
+                'id' => 8,
+                'fieldWithArgs' => 8,
+            ],
+        ], $resolversCalled);
+
+        // Test change field selection in sub-graph invalidates cache
+        $queryContainer = $queryContainerFactory->create(
+        /** @lang GraphQL */ '
+{
+    objects1 {
+        id
+        subObjects2 {
+            id
+        }
+    }
+}',
+            operationName: null,
+            variables: []
+        );
+        $result = $executor->execute($queryContainer, null);
+        foreach ($result->errors as $error) {
+            throw $error;
+        }
+
+        self::assertEquals([
+            'Query' => [
+                'objects1' => 4,
+            ],
+            'Object1' => [
+                'id' => 8,
+                'subObjects2' => 6,
+            ],
+            'Object2' => [
+                'id' => 12,
+                'fieldWithArgs' => 8,
             ],
         ], $resolversCalled);
     }
