@@ -19,7 +19,7 @@ use GraphQL\Type\Schema;
 
 class CacheKeyGenerator
 {
-    public function getKey(ResolveInfo $info): string
+    public function getKeys(ResolveInfo $info): array
     {
         /**
          * @var array<int, mixed>
@@ -43,11 +43,12 @@ class CacheKeyGenerator
                 $type,
                 $info->schema,
                 $info->variableValues,
-                $cacheKeys[$fieldNode->name->value]
+                $info->fragments,
+                $cacheKeys[$fieldNode->name->value],
             );
         }
 
-        return md5(serialize($cacheKeys));
+        return $cacheKeys;
     }
 
     /**
@@ -59,13 +60,21 @@ class CacheKeyGenerator
         SelectionSetNode $selectionSet,
         Schema $schema,
         array $variableValues,
+        array $fragments,
         array &$cacheKeys
     ): void {
         $type = Type::getNamedType($type);
 
         if ($type instanceof ObjectType || $type instanceof AbstractType) {
             $cacheKeys['fields'] = [];
-            $this->analyzeSelectionSet($selectionSet, $type, $schema, $variableValues, $cacheKeys['fields']);
+            $this->analyzeSelectionSet(
+                $selectionSet,
+                $type,
+                $schema,
+                $variableValues,
+                $fragments,
+                $cacheKeys['fields']
+            );
         }
     }
 
@@ -78,6 +87,7 @@ class CacheKeyGenerator
         Type $parentType,
         Schema $schema,
         array $variableValues,
+        array $fragments,
         array &$cacheKeys
     ): void {
         foreach ($selectionSet->selections as $selection) {
@@ -109,12 +119,13 @@ class CacheKeyGenerator
                         $nestedSelectionSet,
                         $schema,
                         $variableValues,
+                        $fragments,
                         $cacheKeys[$fieldName]
                     );
                 }
             } elseif ($selection instanceof FragmentSpreadNode) {
                 $spreadName = $selection->name->value;
-                $fragment = $this->fragments[$spreadName] ?? null;
+                $fragment = $fragments[$spreadName] ?? null;
 
                 if ($fragment === null) {
                     continue;
@@ -123,7 +134,14 @@ class CacheKeyGenerator
                 $type = $schema->getType($fragment->typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields($type, $fragment->selectionSet, $schema, $variableValues, $cacheKeys);
+                $this->analyzeSubFields(
+                    $type,
+                    $fragment->selectionSet,
+                    $schema,
+                    $variableValues,
+                    $fragments,
+                    $cacheKeys
+                );
             } elseif ($selection instanceof InlineFragmentNode) {
                 $typeCondition = $selection->typeCondition;
                 $type = $typeCondition === null
@@ -131,7 +149,14 @@ class CacheKeyGenerator
                     : $schema->getType($typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields($type, $selection->selectionSet, $schema, $variableValues, $cacheKeys);
+                $this->analyzeSubFields(
+                    $type,
+                    $selection->selectionSet,
+                    $schema,
+                    $variableValues,
+                    $fragments,
+                    $cacheKeys
+                );
             }
         }
     }

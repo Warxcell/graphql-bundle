@@ -728,7 +728,7 @@ class OptimizedExecutor implements ExecutorImplementation
             ))) {
             assert($cacheConfig instanceof CacheConfig);
 
-            $key = sprintf('%s|%s', $cacheConfig->cacheKey, $this->cacheKeyGenerator->getKey($info));
+            $key = sprintf('%s|%s', $cacheConfig->cacheKey, md5(serialize($this->cacheKeyGenerator->getKeys($info))));
             $cacheItem = $this->cache->getItem($key);
             if ($cacheItem->isHit()) {
                 return $cacheItem->get();
