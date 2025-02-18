@@ -45,7 +45,7 @@
   "extra": {
     "patches": {
       "webonyx/graphql-php": {
-        "add_cache": "webonyx_graphql_add_cache.patch"
+        "add_cache": "/webonyx_graphql_add_cache.patch"
       }
     }
   }
