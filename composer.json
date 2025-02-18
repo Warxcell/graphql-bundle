@@ -17,7 +17,7 @@
     "psr/http-server-handler": "^1.0"
   },
   "require-dev": {
-    "cweagans/composer-patches": "^1.7",
+    "cweagans/composer-patches": "2.0.0-beta2",
     "nette/php-generator": "^4.0",
     "arxy/graphql-codegen": "dev-main",
     "symfony/stopwatch": "^5.0 | ^6.0 | ^7.0",
@@ -40,13 +40,6 @@
   "config": {
     "allow-plugins": {
       "cweagans/composer-patches": true
-    }
-  },
-  "extra": {
-    "patches": {
-      "webonyx/graphql-php": {
-        "add_cache": "./webonyx_graphql_add_cache.patch"
-      }
     }
   }
 }
