@@ -91,14 +91,14 @@ final class ArxyGraphQLExtension extends Extension
         $executorDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
         $executorDef->setArgument('$cacheItemPool', new Reference($executionResultCache));
 
-
-        $cachedExecutorDef = new Definition(CacheResponseExecutor::class);
-        $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
-        $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
-        $cachedExecutorDef->setAutoconfigured(true);
-        $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
-
-        $container->setDefinition(CacheResponseExecutor::class, $cachedExecutorDef);
+//
+//        $cachedExecutorDef = new Definition(CacheResponseExecutor::class);
+//        $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
+//        $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
+//        $cachedExecutorDef->setAutoconfigured(true);
+//        $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
+//
+//        $container->setDefinition(CacheResponseExecutor::class, $cachedExecutorDef);
 
 
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
