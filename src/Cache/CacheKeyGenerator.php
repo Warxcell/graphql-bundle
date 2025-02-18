@@ -42,7 +42,7 @@ class CacheKeyGenerator
                 $fieldNode->selectionSet,
                 $type,
                 $info->schema,
-                $info->rawVariableValues,
+                $info->variableValues,
                 $cacheKeys[$fieldNode->name->value]
             );
         }
@@ -51,33 +51,33 @@ class CacheKeyGenerator
     }
 
     /**
-     * @param array<string, mixed> $rawVariableValues
+     * @param array<string, mixed> $variableValues
      * @param array<int, mixed> $cacheKeys
      */
     private function analyzeSubFields(
         Type $type,
         SelectionSetNode $selectionSet,
         Schema $schema,
-        array $rawVariableValues,
+        array $variableValues,
         array &$cacheKeys
     ): void {
         $type = Type::getNamedType($type);
 
         if ($type instanceof ObjectType || $type instanceof AbstractType) {
             $cacheKeys['fields'] = [];
-            $this->analyzeSelectionSet($selectionSet, $type, $schema, $rawVariableValues, $cacheKeys['fields']);
+            $this->analyzeSelectionSet($selectionSet, $type, $schema, $variableValues, $cacheKeys['fields']);
         }
     }
 
     /**
-     * @param array<string, mixed> $rawVariableValues
+     * @param array<string, mixed> $variableValues
      * @param array<int, mixed> $cacheKeys
      */
     private function analyzeSelectionSet(
         SelectionSetNode $selectionSet,
         Type $parentType,
         Schema $schema,
-        array $rawVariableValues,
+        array $variableValues,
         array &$cacheKeys
     ): void {
         foreach ($selectionSet->selections as $selection) {
@@ -95,7 +95,7 @@ class CacheKeyGenerator
                 $type = $parentType->getField($fieldName);
                 $selectionType = $type->getType();
 
-                $args = Values::getArgumentValues($type, $selection, $rawVariableValues);
+                $args = Values::getArgumentValues($type, $selection, $variableValues);
 
                 if ($args !== []) {
                     $cacheKeys[$fieldName]['args'] = $args;
@@ -108,7 +108,7 @@ class CacheKeyGenerator
                         $selectionType,
                         $nestedSelectionSet,
                         $schema,
-                        $rawVariableValues,
+                        $variableValues,
                         $cacheKeys[$fieldName]
                     );
                 }
@@ -123,7 +123,7 @@ class CacheKeyGenerator
                 $type = $schema->getType($fragment->typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields($type, $fragment->selectionSet, $schema, $rawVariableValues, $cacheKeys);
+                $this->analyzeSubFields($type, $fragment->selectionSet, $schema, $variableValues, $cacheKeys);
             } elseif ($selection instanceof InlineFragmentNode) {
                 $typeCondition = $selection->typeCondition;
                 $type = $typeCondition === null
@@ -131,7 +131,7 @@ class CacheKeyGenerator
                     : $schema->getType($typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields($type, $selection->selectionSet, $schema, $rawVariableValues, $cacheKeys);
+                $this->analyzeSubFields($type, $selection->selectionSet, $schema, $variableValues, $cacheKeys);
             }
         }
     }

@@ -8,6 +8,7 @@ use Arxy\GraphQL\Cache\CacheConfig;
 use Arxy\GraphQL\Cache\CacheKeyGenerator;
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
+use GraphQL\Executor\ExecutionContext;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Executor;
 use GraphQL\Executor\ExecutorImplementation;
@@ -242,7 +243,6 @@ class OptimizedExecutor implements ExecutorImplementation
             $contextValue,
             $operation,
             $variableValues,
-            $rawVariableValues,
             $errors,
             $fieldResolver,
             $argsMapper,
