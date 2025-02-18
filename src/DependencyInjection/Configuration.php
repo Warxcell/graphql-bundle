@@ -78,7 +78,11 @@ final class Configuration implements ConfigurationInterface
                 ->end()
                 ->arrayNode('cache_resolvers')
                     ->useAttributeAsKey('__object')
-                    ->scalarPrototype()
+                    ->arrayPrototype()
+                        ->useAttributeAsKey('__field')
+                            ->scalarPrototype()
+                        ->end()
+                    ->end()
                 ->end()
             ->end();
         // @formatter:on
