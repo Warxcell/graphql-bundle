@@ -6,7 +6,7 @@ namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
-use Arxy\GraphQL\Controller\CachedExecutor;
+use Arxy\GraphQL\Controller\CacheResponseExecutor;
 use Arxy\GraphQL\Controller\Executor;
 use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
@@ -41,7 +41,7 @@ final class ArxyGraphQLExtension extends Extension
         $configuration = new Configuration();
         $config = $this->processConfiguration($configuration, $configs);
 
-        $loader = new PhpFileLoader($container, new FileLocator(__DIR__ . '/../Resources/config'));
+        $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../Resources/config'));
         $loader->load('services.php');
 
         if ($debug) {
@@ -55,7 +55,7 @@ final class ArxyGraphQLExtension extends Extension
         }
 
         $schemas = $config['schema'];
-        $schemas[] = __DIR__ . '/../Resources/graphql/schema.graphql';
+        $schemas[] = __DIR__.'/../Resources/graphql/schema.graphql';
         $schemaBuilderDef = $container->getDefinition(SchemaBuilder::class);
         $schemaBuilderDef->setArgument('$debug', $debug);
 
@@ -67,11 +67,13 @@ final class ArxyGraphQLExtension extends Extension
         $executableSchemaBuilderDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
 
         $cacheResolvers = [];
-        foreach ($config['cache_resolvers'] as $objectName => $cacheResolver) {
-            $cacheResolvers[$objectName] = new Reference($cacheResolver);
+        foreach ($config['cache_resolvers'] as $objectName => $fields) {
+            foreach ($fields as $fieldName => $cacheResolver) {
+                $cacheResolvers[$objectName][$fieldName] = new Reference($cacheResolver);
+            }
         }
 
-        $executableSchemaBuilderDef->setArgument('$cacheResolvers', new ServiceLocatorArgument($cacheResolvers));
+        $executableSchemaBuilderDef->setArgument('$cacheResolvers', $cacheResolvers);
 
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
@@ -81,22 +83,23 @@ final class ArxyGraphQLExtension extends Extension
         $queryContainerFactoryDef = $container->getDefinition(QueryContainerFactory::class);
         $queryContainerFactoryDef->setArgument('$queryCache', new Reference($config['query_cache']));
 
+        $executionResultCache = $config['operation_execution_result_cache'];
+
         $executorDef = $container->getDefinition(Executor::class);
         $executorDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $executorDef->setArgument('$debug', $debug);
         $executorDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
+        $executorDef->setArgument('$cacheItemPool', new Reference($executionResultCache));
 
-        $executionResultCache = $config['operation_execution_result_cache'] ?? null;
 
-        if ($executionResultCache) {
-            $cachedExecutorDef = new Definition(CachedExecutor::class);
-            $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
-            $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
-            $cachedExecutorDef->setAutoconfigured(true);
-            $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
+        $cachedExecutorDef = new Definition(CacheResponseExecutor::class);
+        $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
+        $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
+        $cachedExecutorDef->setAutoconfigured(true);
+        $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
 
-            $container->setDefinition(CachedExecutor::class, $cachedExecutorDef);
-        }
+        $container->setDefinition(CacheResponseExecutor::class, $cachedExecutorDef);
+
 
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
         $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);
@@ -110,15 +113,15 @@ final class ArxyGraphQLExtension extends Extension
         if (!$debug) {
             $cachedDocumentNodeProvider = new Definition(CachedDocumentNodeProvider::class);
             $cachedDocumentNodeProvider->setArgument('$documentNodeProvider', new Reference('.inner'));
-            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'] . '/schema.php');
+            $cachedDocumentNodeProvider->setArgument('$cacheFile', $config['cache_dir'].'/schema.php');
             $cachedDocumentNodeProvider->setDecoratedService(DocumentNodeProvider::class);
             $container->setDefinition(CachedDocumentNodeProvider::class, $cachedDocumentNodeProvider);
         }
 
         $container->registerAttributeForAutoconfiguration(Resolver::class, static function (
             ChildDefinition $definition,
-            Resolver        $resolver,
-            Reflector       $reflection
+            Resolver $resolver,
+            Reflector $reflection
         ): void {
             if (!$reflection instanceof ReflectionClass) {
                 return;

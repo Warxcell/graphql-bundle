@@ -97,7 +97,7 @@ final class SchemaBuilder
      */
     public function makeExecutableSchema(
         array $resolvers,
-        ServiceLocator $cacheResolvers,
+        array $cacheResolvers,
         array $inputObjectsMapping,
         array $enumsMapping,
         ValidatorInterface $validator,
@@ -188,29 +188,26 @@ final class SchemaBuilder
                 return $typeConfig;
             }
 
-            $resolver = $resolvers[$node->name->value][$fieldDefinitionNode->name->value];
-            $typeConfig['resolve'] = $resolver;
+            $typeConfig['resolve'] = $resolvers[$node->name->value][$fieldDefinitionNode->name->value] ?? null;
+            $typeConfig['cacheResolver'] = $cacheResolvers[$node->name->value][$fieldDefinitionNode->name->value] ?? null;
 
-            $cacheResolver = $cacheResolvers->has($node->name->value) ? $cacheResolvers->get($node->name->value) : null;
-            if ($cacheResolver && method_exists($cacheResolver, $fieldDefinitionNode->name->value)) {
-                $typeConfig['cacheResolver'] = [$cacheResolver, $fieldDefinitionNode->name->value];
-            }
+            $class = $argumentsMapping[$node->name->value][$fieldDefinitionNode->name->value] ?? null;
+            if ($class !== null) {
+                $typeConfig['argsMapper'] = function (array $args) use ($class, $validator) {
+                    $validate = count($args) > 0;
 
-            $class = $argumentsMapping[$node->name->value][$fieldDefinitionNode->name->value];
-            $typeConfig['argsMapper'] = function (array $args) use ($class, $validator) {
-                $validate = count($args) > 0;
+                    $args = new $class(...$args);
 
-                $args = new $class(...$args);
-
-                if ($validate) { // validate is slow - we are stopping it here, because its empty object anyway - we optimized it :)
-                    $errors = $validator->validate($args);
-                    if (count($errors) > 0) {
-                        throw new ConstraintViolationException($errors);
+                    if ($validate) { // validate is slow - we are stopping it here, because its empty object anyway - we optimized it :)
+                        $errors = $validator->validate($args);
+                        if (count($errors) > 0) {
+                            throw new ConstraintViolationException($errors);
+                        }
                     }
-                }
 
-                return $args;
-            };
+                    return $args;
+                };
+            }
 
             return $typeConfig;
         };

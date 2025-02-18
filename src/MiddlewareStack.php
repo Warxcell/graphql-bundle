@@ -10,7 +10,7 @@ final class MiddlewareStack
 {
     public static function wrap(callable $next, callable $original): Closure
     {
-        return static fn (
+        return static fn(
             mixed $parent,
             mixed $args,
             mixed $context,

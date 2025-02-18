@@ -24,7 +24,8 @@
     "phpunit/phpunit": "^10.4",
     "phpstan/phpstan": "^1.10",
     "psr/cache": "^3.0",
-    "sentry/sentry": "*"
+    "sentry/sentry": "*",
+    "symfony/cache": "^7.2"
   },
   "autoload": {
     "psr-4": {
@@ -39,6 +40,13 @@
   "config": {
     "allow-plugins": {
       "cweagans/composer-patches": true
+    }
+  },
+  "extra": {
+    "patches": {
+      "webonyx/graphql-php": {
+        "add_cache": "./webonyx_graphql_add_cache.patch"
+      }
     }
   }
 }

@@ -19,7 +19,7 @@ use const JSON_THROW_ON_ERROR;
 /**
  * @implements ExecutorInterface<mixed>
  */
-final readonly class CachedExecutor implements ExecutorInterface
+final readonly class CacheResponseExecutor implements ExecutorInterface
 {
     public function __construct(
         /** @var ExecutorInterface<mixed> */

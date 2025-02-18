@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\GraphQL;
 
+use Arxy\GraphQL\Cache\CacheConfig;
+use Arxy\GraphQL\Cache\CacheKeyGenerator;
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
 use GraphQL\Executor\ExecutionResult;
@@ -36,7 +38,7 @@ use GraphQL\Type\Schema;
 use GraphQL\Type\SchemaValidationContext;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\Utils;
-use Psr\Cache\CacheItemInterface;
+use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * @phpstan-import-type FieldResolver from Executor
@@ -73,8 +75,11 @@ class OptimizedExecutor implements ExecutorImplementation
      */
     protected \SplObjectStorage $fieldArgsCache;
 
-    protected function __construct(ExecutionContext $context)
-    {
+    protected function __construct(
+        ExecutionContext $context,
+        private CacheItemPoolInterface $cache,
+        private CacheKeyGenerator $cacheKeyGenerator
+    ) {
         if (!isset(static::$UNDEFINED)) {
             static::$UNDEFINED = Utils::undefined();
         }
@@ -103,9 +108,10 @@ class OptimizedExecutor implements ExecutorImplementation
         array $variableValues,
         ?string $operationName,
         callable $fieldResolver,
-        ?callable $argsMapper = null, // TODO make non-optional in next major release
-    ): ExecutorImplementation
-    {
+        callable $argsMapper,
+        CacheItemPoolInterface $cache,
+        CacheKeyGenerator $cacheKeyGenerator
+    ): ExecutorImplementation {
         $exeContext = static::buildExecutionContext(
             $schema,
             $documentNode,
@@ -136,7 +142,7 @@ class OptimizedExecutor implements ExecutorImplementation
             };
         }
 
-        return new static($exeContext);
+        return new static($exeContext, $cache, $cacheKeyGenerator);
     }
 
     /**
@@ -258,6 +264,9 @@ class OptimizedExecutor implements ExecutorImplementation
         // be executed. An execution which encounters errors will still result in a
         // resolved Promise.
         $data = $this->executeOperation($this->exeContext->operation, $this->exeContext->rootValue);
+
+        $this->cache->commit();
+
         $result = $this->buildResponse($data);
 
         // Note: we deviate here from the reference implementation a bit by always returning promise
@@ -711,11 +720,73 @@ class OptimizedExecutor implements ExecutorImplementation
             $contextValue
         );
 
-        $cacheItem = null;
-        if (null !== $fieldDef->cacheResolver) {
-            $cacheItem = ($fieldDef->cacheResolver)($rootValue, $args, $contextValue, $info);
+        if (null !== $fieldDef->cacheResolver && null !== ($cacheConfig = ($fieldDef->cacheResolver)(
+                $rootValue,
+                $args,
+                $contextValue,
+                $info
+            ))) {
+            assert($cacheConfig instanceof CacheConfig);
+
+            $key = sprintf('%s|%s', $cacheConfig->cacheKey, $this->cacheKeyGenerator->getKey($info));
+            $cacheItem = $this->cache->getItem($key);
+            if ($cacheItem->isHit()) {
+                return $cacheItem->get();
+            }
+
+            $cacheItem->expiresAfter($cacheConfig->ttl);
+
+            $completed = $this->resolveFieldAndComplete(
+                $fieldDef,
+                $rootValue,
+                $args,
+                $contextValue,
+                $info,
+                $returnType,
+                $fieldNodes,
+                $path,
+                $unaliasedPath
+            );
+
+            $setCache = function ($completed) use ($cacheItem) {
+                $cacheItem->set($completed);
+                $this->cache->saveDeferred($cacheItem);
+
+                return $completed;
+            };
+
+            $promise = $this->getPromise($completed);
+            if ($promise !== null) {
+                return $promise->then($setCache);
+            }
+
+            return $setCache($completed);
         }
 
+        return $this->resolveFieldAndComplete(
+            $fieldDef,
+            $rootValue,
+            $args,
+            $contextValue,
+            $info,
+            $returnType,
+            $fieldNodes,
+            $path,
+            $unaliasedPath
+        );
+    }
+
+    private function resolveFieldAndComplete(
+        FieldDefinition $fieldDef,
+        $rootValue,
+        $args,
+        $contextValue,
+        $info,
+        $returnType,
+        $fieldNodes,
+        $path,
+        $unaliasedPath
+    ): mixed {
         $resolveFn = $fieldDef->resolveFn
             ?? $parentType->resolveFieldFn
             ?? $this->exeContext->fieldResolver;
@@ -736,8 +807,7 @@ class OptimizedExecutor implements ExecutorImplementation
             $path,
             $unaliasedPath,
             $result,
-            $contextValue,
-            $cacheItem
+            $contextValue
         );
     }
 
@@ -806,7 +876,6 @@ class OptimizedExecutor implements ExecutorImplementation
         array $unaliasedPath,
         $result,
         $contextValue,
-        ?CacheItemInterface $cacheItem
     ) {
         // Otherwise, error protection is applied, logging the error and resolving
         // a null value for this field if one is encountered.
@@ -839,18 +908,12 @@ class OptimizedExecutor implements ExecutorImplementation
             $promise = $this->getPromise($completed);
             if ($promise !== null) {
                 return $promise->then(
-                    function ($completed) use ($cacheItem) {
-                        $cacheItem?->set($completed);
-
-                        return $completed;
-                    },
+                    null,
                     function ($error) use ($fieldNodes, $path, $unaliasedPath, $returnType): void {
                         $this->handleFieldError($error, $fieldNodes, $path, $unaliasedPath, $returnType);
                     }
                 );
             }
-
-            $cacheItem?->set($completed);
 
             return $completed;
         } catch (\Throwable $err) {
@@ -1112,8 +1175,7 @@ class OptimizedExecutor implements ExecutorImplementation
                 $itemPath,
                 $itemUnaliasedPath,
                 $item,
-                $contextValue,
-                null
+                $contextValue
             );
 
             $completedItems[] = $completedItem;
