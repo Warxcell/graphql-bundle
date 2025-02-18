@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Cache;
 
-use Arxy\GraphQL\GraphQL\ResolveInfo;
 use GraphQL\Executor\Values;
 use GraphQL\Language\AST\FieldNode;
 use GraphQL\Language\AST\FragmentSpreadNode;
@@ -13,6 +12,7 @@ use GraphQL\Language\AST\SelectionSetNode;
 use GraphQL\Type\Definition\AbstractType;
 use GraphQL\Type\Definition\HasFieldsType;
 use GraphQL\Type\Definition\ObjectType;
+use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Introspection;
 use GraphQL\Type\Schema;

@@ -33,6 +33,7 @@ use GraphQL\Type\Definition\NamedType;
 use GraphQL\Type\Definition\NonNull;
 use GraphQL\Type\Definition\ObjectType;
 use GraphQL\Type\Definition\OutputType;
+use GraphQL\Type\Definition\ResolveInfo;
 use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Introspection;
 use GraphQL\Type\Schema;
@@ -696,7 +697,6 @@ class OptimizedExecutor implements ExecutorImplementation
             $exeContext->rootValue,
             $exeContext->operation,
             $exeContext->variableValues,
-            $exeContext->rawVariableValues,
             $unaliasedPath
         );
 
