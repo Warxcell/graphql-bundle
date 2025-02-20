@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\GraphQL;
 
+use Arxy\GraphQL\Cache\CacheConfig;
+use Arxy\GraphQL\Cache\CacheKeyGenerator;
 use GraphQL\Error\Error;
 use GraphQL\Error\InvariantViolation;
 use GraphQL\Executor\ExecutionContext;
@@ -38,6 +40,7 @@ use GraphQL\Type\Schema;
 use GraphQL\Type\SchemaValidationContext;
 use GraphQL\Utils\AST;
 use GraphQL\Utils\Utils;
+use Psr\Cache\CacheItemPoolInterface;
 
 /**
  * @phpstan-import-type FieldResolver from Executor
@@ -74,8 +77,11 @@ class OptimizedExecutor implements ExecutorImplementation
      */
     protected \SplObjectStorage $fieldArgsCache;
 
-    protected function __construct(ExecutionContext $context)
-    {
+    protected function __construct(
+        ExecutionContext $context,
+        private CacheItemPoolInterface $cache,
+        private CacheKeyGenerator $cacheKeyGenerator
+    ) {
         if (!isset(static::$UNDEFINED)) {
             static::$UNDEFINED = Utils::undefined();
         }
@@ -104,9 +110,10 @@ class OptimizedExecutor implements ExecutorImplementation
         array $variableValues,
         ?string $operationName,
         callable $fieldResolver,
-        ?callable $argsMapper = null // TODO make non-optional in next major release,
-    ): ExecutorImplementation
-    {
+        callable $argsMapper,
+        CacheItemPoolInterface $cache,
+        CacheKeyGenerator $cacheKeyGenerator
+    ): ExecutorImplementation {
         $exeContext = static::buildExecutionContext(
             $schema,
             $documentNode,
@@ -137,7 +144,7 @@ class OptimizedExecutor implements ExecutorImplementation
             };
         }
 
-        return new static($exeContext);
+        return new static($exeContext, $cache, $cacheKeyGenerator);
     }
 
     /**
@@ -258,6 +265,9 @@ class OptimizedExecutor implements ExecutorImplementation
         // be executed. An execution which encounters errors will still result in a
         // resolved Promise.
         $data = $this->executeOperation($this->exeContext->operation, $this->exeContext->rootValue);
+
+        $this->cache->commit();
+
         $result = $this->buildResponse($data);
 
         // Note: we deviate here from the reference implementation a bit by always returning promise
@@ -690,25 +700,105 @@ class OptimizedExecutor implements ExecutorImplementation
             $unaliasedPath
         );
 
-        $resolveFn = $fieldDef->resolveFn
-            ?? $parentType->resolveFieldFn
-            ?? $this->exeContext->fieldResolver;
+        // Build a map of arguments from the field.arguments AST, using the
+        // variables scope to fulfill any variable references.
+        // @phpstan-ignore-next-line generics of SplObjectStorage are not inferred from empty instantiation
+        $this->fieldArgsCache[$fieldDef] ??= new \SplObjectStorage();
 
         $argsMapper = $fieldDef->argsMapper
             ?? $parentType->argsMapper
             ?? $this->exeContext->argsMapper;
 
-        // Get the resolve function, regardless of if its result is normal
-        // or abrupt (error).
-        $result = $this->resolveFieldValueOrError(
+        $args = $this->fieldArgsCache[$fieldDef][$fieldNode] ??= $argsMapper(
+            Values::getArgumentValues(
+                $fieldDef,
+                $fieldNode,
+                $this->exeContext->variableValues
+            ),
             $fieldDef,
             $fieldNode,
-            $resolveFn,
-            $argsMapper,
-            $rootValue,
-            $info,
             $contextValue
         );
+
+        if (null !== $fieldDef->cacheResolver && null !== ($cacheConfig = ($fieldDef->cacheResolver)(
+                $rootValue,
+                $args,
+                $contextValue,
+                $info
+            ))) {
+            assert($cacheConfig instanceof CacheConfig);
+
+            $key = sprintf('%s|%s', $cacheConfig->cacheKey, md5(serialize($this->cacheKeyGenerator->getKeys($info))));
+            $cacheItem = $this->cache->getItem($key);
+            if ($cacheItem->isHit()) {
+                return $cacheItem->get();
+            }
+
+            $cacheItem->expiresAfter($cacheConfig->ttl);
+
+            $completed = $this->resolveFieldAndComplete(
+                $fieldDef,
+                $rootValue,
+                $args,
+                $contextValue,
+                $info,
+                $returnType,
+                $fieldNodes,
+                $path,
+                $unaliasedPath
+            );
+
+            $setCache = function ($completed) use ($cacheItem) {
+                $cacheItem->set($completed);
+                $this->cache->saveDeferred($cacheItem);
+
+                return $completed;
+            };
+
+            $promise = $this->getPromise($completed);
+            if ($promise !== null) {
+                return $promise->then($setCache);
+            }
+
+            return $setCache($completed);
+        }
+
+        return $this->resolveFieldAndComplete(
+            $fieldDef,
+            $rootValue,
+            $args,
+            $contextValue,
+            $info,
+            $returnType,
+            $fieldNodes,
+            $path,
+            $unaliasedPath
+        );
+    }
+
+    private function resolveFieldAndComplete(
+        FieldDefinition $fieldDef,
+        $rootValue,
+        $args,
+        $contextValue,
+        $info,
+        $returnType,
+        $fieldNodes,
+        $path,
+        $unaliasedPath
+    ): mixed {
+        $resolveFn = $fieldDef->resolveFn
+            ?? $parentType->resolveFieldFn
+            ?? $this->exeContext->fieldResolver;
+
+
+        // Get the resolve function, regardless of if its result is normal
+        // or abrupt (error).
+        try {
+            $result = $resolveFn($rootValue, $args, $contextValue, $info);
+        } catch (\Throwable $error) {
+            $result = $error;
+        }
 
         return $this->completeValueCatchingError(
             $returnType,
@@ -759,48 +849,6 @@ class OptimizedExecutor implements ExecutorImplementation
         return $parentType->findField($fieldName);
     }
 
-    /**
-     * Isolates the "ReturnOrAbrupt" behavior to not de-opt the `resolveField` function.
-     * Returns the result of resolveFn or the abrupt-return Error object.
-     *
-     * @param mixed $rootValue
-     * @param mixed $contextValue
-     *
-     * @phpstan-param FieldResolver $resolveFn
-     *
-     * @return \Throwable|Promise|mixed
-     */
-    protected function resolveFieldValueOrError(
-        FieldDefinition $fieldDef,
-        FieldNode $fieldNode,
-        callable $resolveFn,
-        callable $argsMapper,
-        $rootValue,
-        ResolveInfo $info,
-        $contextValue
-    ) {
-        try {
-            // Build a map of arguments from the field.arguments AST, using the
-            // variables scope to fulfill any variable references.
-            // @phpstan-ignore-next-line generics of SplObjectStorage are not inferred from empty instantiation
-            $this->fieldArgsCache[$fieldDef] ??= new \SplObjectStorage();
-
-            $args = $this->fieldArgsCache[$fieldDef][$fieldNode] ??= $argsMapper(
-                Values::getArgumentValues(
-                    $fieldDef,
-                    $fieldNode,
-                    $this->exeContext->variableValues
-                ),
-                $fieldDef,
-                $fieldNode,
-                $contextValue
-            );
-
-            return $resolveFn($rootValue, $args, $contextValue, $info);
-        } catch (\Throwable $error) {
-            return $error;
-        }
-    }
 
     /**
      * This is a small wrapper around completeValue which detects and logs errors
@@ -827,7 +875,7 @@ class OptimizedExecutor implements ExecutorImplementation
         array $path,
         array $unaliasedPath,
         $result,
-        $contextValue
+        $contextValue,
     ) {
         // Otherwise, error protection is applied, logging the error and resolving
         // a null value for this field if one is encountered.
