@@ -17,8 +17,18 @@ use GraphQL\Type\Definition\Type;
 use GraphQL\Type\Introspection;
 use GraphQL\Type\Schema;
 
-class CacheKeyGenerator
+final class CacheKeyGenerator
 {
+    /**
+     * @var \WeakMap<FieldNode, mixed>
+     */
+    private \WeakMap $cache;
+
+    public function __construct()
+    {
+        $this->cache = new \WeakMap();
+    }
+
     public function getKeys(ResolveInfo $info): array
     {
         /**
@@ -27,25 +37,26 @@ class CacheKeyGenerator
         $cacheKeys = [];
 
         foreach ($info->fieldNodes as $fieldNode) {
-            if ($fieldNode->selectionSet === null) {
-                continue;
+            if (!$this->cache->offsetExists($fieldNode)) {
+                if ($fieldNode->selectionSet === null) {
+                    continue;
+                }
+
+                $type = Type::getNamedType(
+                    $info->parentType->getField($fieldNode->name->value)->getType()
+                );
+                assert($type instanceof Type, 'known because schema validation');
+
+                $cacheKeys[$fieldNode->name->value] = $this->cache[$fieldNode] = $this->analyzeSelectionSet(
+                    $fieldNode->selectionSet,
+                    $type,
+                    $info->schema,
+                    $info->variableValues,
+                    $info->fragments,
+                );
+            } else {
+                $cacheKeys[$fieldNode->name->value] = $this->cache->offsetGet($fieldNode);
             }
-
-            $type = Type::getNamedType(
-                $info->parentType->getField($fieldNode->name->value)->getType()
-            );
-            assert($type instanceof Type, 'known because schema validation');
-
-            $cacheKeys[$fieldNode->name->value] = [];
-
-            $this->analyzeSelectionSet(
-                $fieldNode->selectionSet,
-                $type,
-                $info->schema,
-                $info->variableValues,
-                $info->fragments,
-                $cacheKeys[$fieldNode->name->value],
-            );
         }
 
         return $cacheKeys;
@@ -53,7 +64,7 @@ class CacheKeyGenerator
 
     /**
      * @param array<string, mixed> $variableValues
-     * @param array<int, mixed> $cacheKeys
+     * @return array<int, mixed>
      */
     private function analyzeSubFields(
         Type $type,
@@ -61,26 +72,25 @@ class CacheKeyGenerator
         Schema $schema,
         array $variableValues,
         array $fragments,
-        array &$cacheKeys
-    ): void {
+    ): array {
         $type = Type::getNamedType($type);
 
         if ($type instanceof ObjectType || $type instanceof AbstractType) {
-            $cacheKeys['fields'] = [];
-            $this->analyzeSelectionSet(
+            return $this->analyzeSelectionSet(
                 $selectionSet,
                 $type,
                 $schema,
                 $variableValues,
                 $fragments,
-                $cacheKeys['fields']
             );
         }
+
+        return [];
     }
 
     /**
      * @param array<string, mixed> $variableValues
-     * @param array<int, mixed> $cacheKeys
+     * @return array<int, mixed>
      */
     private function analyzeSelectionSet(
         SelectionSetNode $selectionSet,
@@ -88,8 +98,8 @@ class CacheKeyGenerator
         Schema $schema,
         array $variableValues,
         array $fragments,
-        array &$cacheKeys
-    ): void {
+    ): array {
+        $cacheKeys = [];
         foreach ($selectionSet->selections as $selection) {
             if ($selection instanceof FieldNode) {
                 $fieldName = $selection->name->value;
@@ -114,13 +124,12 @@ class CacheKeyGenerator
                 $nestedSelectionSet = $selection->selectionSet;
 
                 if (null !== $nestedSelectionSet) {
-                    $this->analyzeSubFields(
+                    $cacheKeys[$fieldName]['fields'] = $this->analyzeSubFields(
                         $selectionType,
                         $nestedSelectionSet,
                         $schema,
                         $variableValues,
-                        $fragments,
-                        $cacheKeys[$fieldName]
+                        $fragments
                     );
                 }
             } elseif ($selection instanceof FragmentSpreadNode) {
@@ -134,14 +143,16 @@ class CacheKeyGenerator
                 $type = $schema->getType($fragment->typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields(
-                    $type,
-                    $fragment->selectionSet,
-                    $schema,
-                    $variableValues,
-                    $fragments,
-                    $cacheKeys
-                );
+                $cacheKeys = [
+                    ...$cacheKeys,
+                    ...$this->analyzeSubFields(
+                        $type,
+                        $fragment->selectionSet,
+                        $schema,
+                        $variableValues,
+                        $fragments,
+                    ),
+                ];
             } elseif ($selection instanceof InlineFragmentNode) {
                 $typeCondition = $selection->typeCondition;
                 $type = $typeCondition === null
@@ -149,15 +160,19 @@ class CacheKeyGenerator
                     : $schema->getType($typeCondition->name->value);
                 assert($type instanceof Type, 'ensured by query validation');
 
-                $this->analyzeSubFields(
-                    $type,
-                    $selection->selectionSet,
-                    $schema,
-                    $variableValues,
-                    $fragments,
-                    $cacheKeys
-                );
+                $cacheKeys = [
+                    ...$cacheKeys,
+                    ...$this->analyzeSubFields(
+                        $type,
+                        $selection->selectionSet,
+                        $schema,
+                        $variableValues,
+                        $fragments,
+                    ),
+                ];
             }
         }
+
+        return $cacheKeys;
     }
 }
