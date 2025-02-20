@@ -6,6 +6,7 @@ namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\Controller\ContextFactoryInterface;
 use Arxy\GraphQL\ErrorsHandler;
+use GraphQL\Executor\Promise\PromiseAdapter;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -72,7 +73,7 @@ final class Configuration implements ConfigurationInterface
                     ->defaultNull()
                 ->end()
                 ->scalarNode('promise_adapter')
-                    ->defaultValue('webonyx_graphql.sync_promise_adapter')
+                    ->defaultValue(PromiseAdapter::class)
                     ->cannotBeEmpty()
                 ->end()
             ->end();
