@@ -105,8 +105,8 @@ class OptimizedExecutor implements ExecutorImplementation
         PromiseAdapter $promiseAdapter,
         Schema $schema,
         DocumentNode $documentNode,
-        $rootValue,
-        $contextValue,
+        mixed $rootValue,
+        mixed $contextValue,
         array $variableValues,
         ?string $operationName,
         callable $fieldResolver,
@@ -122,7 +122,7 @@ class OptimizedExecutor implements ExecutorImplementation
             $variableValues,
             $operationName,
             $fieldResolver,
-            $argsMapper ?? Executor::getDefaultArgsMapper(),
+            $argsMapper,
             $promiseAdapter,
         );
 
@@ -272,10 +272,8 @@ class OptimizedExecutor implements ExecutorImplementation
 
         // Note: we deviate here from the reference implementation a bit by always returning promise
         // But for the "sync" case it is always fulfilled
-
-        $promise = $this->getPromise($result);
-        if ($promise !== null) {
-            return $promise;
+        if ($this->isPromise($result)) {
+            return $result;
         }
 
         return $this->exeContext->promiseAdapter->createFulfilled($result);
@@ -338,9 +336,8 @@ class OptimizedExecutor implements ExecutorImplementation
                     $this->exeContext->contextValue
                 );
 
-            $promise = $this->getPromise($result);
-            if ($promise !== null) {
-                return $promise->then(null, [$this, 'onError']);
+            if ($this->isPromise($result)) {
+                return $result->then(null, [$this, 'onError']);
             }
 
             return $result;
@@ -604,9 +601,8 @@ class OptimizedExecutor implements ExecutorImplementation
                     return $results;
                 }
 
-                $promise = $this->getPromise($result);
-                if ($promise !== null) {
-                    return $promise->then(static function ($resolvedResult) use ($responseName, $results): array {
+                if ($this->isPromise($result)) {
+                    return $result->then(static function ($resolvedResult) use ($responseName, $results): array {
                         $results[$responseName] = $resolvedResult;
 
                         return $results;
@@ -620,8 +616,7 @@ class OptimizedExecutor implements ExecutorImplementation
             []
         );
 
-        $promise = $this->getPromise($result);
-        if ($promise !== null) {
+        if ($this->isPromise($result)) {
             return $result->then(
                 static fn($resolvedResults) => static::fixResultsIfEmptyArray($resolvedResults)
             );
@@ -749,9 +744,8 @@ class OptimizedExecutor implements ExecutorImplementation
                 return $completed;
             };
 
-            $promise = $this->getPromise($completed);
-            if ($promise !== null) {
-                return $promise->then($setCache);
+            if ($this->isPromise($completed)) {
+                return $completed->then($setCache);
             }
 
             return $setCache($completed);
@@ -874,9 +868,8 @@ class OptimizedExecutor implements ExecutorImplementation
         // Otherwise, error protection is applied, logging the error and resolving
         // a null value for this field if one is encountered.
         try {
-            $promise = $this->getPromise($result);
-            if ($promise !== null) {
-                $completed = $promise->then(
+            if ($this->isPromise($result)) {
+                $completed = $result->then(
                     fn(&$resolved) => $this->completeValue(
                         $returnType,
                         $fieldNodes,
@@ -899,9 +892,8 @@ class OptimizedExecutor implements ExecutorImplementation
                 );
             }
 
-            $promise = $this->getPromise($completed);
-            if ($promise !== null) {
-                return $promise->then(
+            if ($this->isPromise($completed)) {
+                return $completed->then(
                     null,
                     function ($error) use ($fieldNodes, $path, $unaliasedPath, $returnType): void {
                         $this->handleFieldError($error, $fieldNodes, $path, $unaliasedPath, $returnType);
@@ -1061,7 +1053,6 @@ class OptimizedExecutor implements ExecutorImplementation
             return $this->completeObjectValue(
                 $returnType,
                 $fieldNodes,
-                $info,
                 $path,
                 $unaliasedPath,
                 $result,
@@ -1073,22 +1064,10 @@ class OptimizedExecutor implements ExecutorImplementation
         throw new \RuntimeException("Cannot complete value of unexpected type {$safeReturnType}.");
     }
 
+    /** @phpstan-assert-if-true Promise $value */
     protected function isPromise(mixed $value): bool
     {
         return $value instanceof Promise;
-    }
-
-    /**
-     * Only returns the value if it acts like a Promise, i.e. has a "then" function,
-     * otherwise returns null.
-     */
-    protected function getPromise(mixed $value): ?Promise
-    {
-        if ($value === null || $value instanceof Promise) {
-            return $value;
-        }
-
-        return null;
     }
 
     /**
@@ -1108,9 +1087,8 @@ class OptimizedExecutor implements ExecutorImplementation
         return \array_reduce(
             $values,
             function ($previous, $value) use ($callback) {
-                $promise = $this->getPromise($previous);
-                if ($promise !== null) {
-                    return $promise->then(static fn($resolved) => $callback($resolved, $value));
+                if ($this->isPromise($previous)) {
+                    return $previous->then(static fn($resolved) => $callback($resolved, $value));
                 }
 
                 return $callback($previous, $value);
@@ -1164,7 +1142,7 @@ class OptimizedExecutor implements ExecutorImplementation
                 $contextValue
             );
 
-            if (!$containsPromise && $this->getPromise($completedItem) !== null) {
+            if (!$containsPromise && $this->isPromise($completedItem)) {
                 $containsPromise = true;
             }
 
@@ -1228,12 +1206,10 @@ class OptimizedExecutor implements ExecutorImplementation
     ) {
         $runtimeType = $returnType->resolveType($result, $contextValue, $info);
 
-        $promise = $this->getPromise($runtimeType);
-        if ($promise !== null) {
-            return $promise->then(fn($resolvedRuntimeType) => $this->completeObjectValue(
+        if ($this->isPromise($runtimeType)) {
+            return $runtimeType->then(fn($resolvedRuntimeType) => $this->completeObjectValue(
                 $resolvedRuntimeType,
                 $fieldNodes,
-                $info,
                 $path,
                 $unaliasedPath,
                 $result,
@@ -1244,7 +1220,6 @@ class OptimizedExecutor implements ExecutorImplementation
         return $this->completeObjectValue(
             $runtimeType,
             $fieldNodes,
-            $info,
             $path,
             $unaliasedPath,
             $result,
@@ -1269,7 +1244,6 @@ class OptimizedExecutor implements ExecutorImplementation
     protected function completeObjectValue(
         ObjectType $returnType,
         \ArrayObject $fieldNodes,
-        ResolveInfo $info,
         array $path,
         array $unaliasedPath,
         &$result,
