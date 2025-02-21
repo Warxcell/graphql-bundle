@@ -292,12 +292,6 @@ class OptimizedExecutor implements ExecutorImplementation
             return $data->then(fn($resolved) => $this->buildResponse($resolved));
         }
 
-        $promiseAdapter = $this->exeContext->promiseAdapter;
-        if ($promiseAdapter->isThenable($data)) {
-            return $promiseAdapter->convertThenable($data)
-                ->then(fn($resolved) => $this->buildResponse($resolved));
-        }
-
         if ($data !== null) {
             $data = (array)$data;
         }
@@ -1079,28 +1073,19 @@ class OptimizedExecutor implements ExecutorImplementation
         throw new \RuntimeException("Cannot complete value of unexpected type {$safeReturnType}.");
     }
 
-    /** @param mixed $value */
-    protected function isPromise($value): bool
+    protected function isPromise(mixed $value): bool
     {
-        return $value instanceof Promise
-            || $this->exeContext->promiseAdapter->isThenable($value);
+        return $value instanceof Promise;
     }
 
     /**
      * Only returns the value if it acts like a Promise, i.e. has a "then" function,
      * otherwise returns null.
-     *
-     * @param mixed $value
      */
-    protected function getPromise($value): ?Promise
+    protected function getPromise(mixed $value): ?Promise
     {
         if ($value === null || $value instanceof Promise) {
             return $value;
-        }
-
-        $promiseAdapter = $this->exeContext->promiseAdapter;
-        if ($promiseAdapter->isThenable($value)) {
-            return $promiseAdapter->convertThenable($value);
         }
 
         return null;
