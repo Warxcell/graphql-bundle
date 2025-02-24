@@ -5,14 +5,9 @@ declare(strict_types=1);
 namespace Arxy\GraphQL;
 
 use Arxy\GraphQL\Debug\TimingMiddleware;
-use Arxy\GraphQL\Security\SecurityCompilerPass;
 use Arxy\GraphQL\Security\SecurityMiddleware;
 use Closure;
-use GraphQL\Language\AST\NodeKind;
-use GraphQL\Language\AST\ObjectTypeDefinitionNode;
-use GraphQL\Language\AST\ObjectTypeExtensionNode;
 use GraphQL\Language\AST\StringValueNode;
-use GraphQL\Language\Visitor;
 use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\InterfaceType;
@@ -200,7 +195,7 @@ final class ArxyGraphQLBundle extends Bundle
                                                         $securityMiddlewareDef = new Definition(
                                                             SecurityMiddleware::class
                                                         );
-                                                        $securityMiddlewareDef->addArgument('$role', $role);
+                                                        $securityMiddlewareDef->setArgument('$role', $role);
 
                                                         $id = sprintf(
                                                             'graphql.security.%s.%s',
