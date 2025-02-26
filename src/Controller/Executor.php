@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
+use Arxy\GraphQL\Cache\CacheKeyGenerator;
 use Arxy\GraphQL\ErrorsHandlerInterface;
 use Arxy\GraphQL\ExceptionInterface;
 use Arxy\GraphQL\ExtensionsAwareContext;
@@ -15,6 +16,7 @@ use GraphQL\Error\FormattedError;
 use GraphQL\Executor\ExecutionResult;
 use GraphQL\Executor\Promise\Adapter\SyncPromiseAdapter;
 use GraphQL\Type\Schema;
+use Psr\Cache\CacheItemPoolInterface;
 use Throwable;
 
 /**
@@ -25,11 +27,14 @@ final readonly class Executor implements ExecutorInterface
     private Closure $errorFormatter;
     private Closure $errorsHandler;
 
+    private CacheKeyGenerator $cacheKeyGenerator;
+
     public function __construct(
         private Schema $schema,
         private SyncPromiseAdapter $promiseAdapter,
         ErrorsHandlerInterface $errorsHandler,
         bool $debug,
+        private CacheItemPoolInterface $cacheItemPool
     ) {
         $this->errorFormatter = FormattedError::prepareFormatter(
             formatter: null,
@@ -57,6 +62,8 @@ final readonly class Executor implements ExecutorInterface
                 return $formatted;
             });
         };
+
+        $this->cacheKeyGenerator = new CacheKeyGenerator();
     }
 
     public function execute(QueryContainer $queryContainer, mixed $context): ExecutionResult
@@ -76,6 +83,8 @@ final readonly class Executor implements ExecutorInterface
             operationName: $operationName,
             fieldResolver: \GraphQL\Executor\Executor::getDefaultFieldResolver(),
             argsMapper: \GraphQL\Executor\Executor::getDefaultArgsMapper(),
+            cache: $this->cacheItemPool,
+            cacheKeyGenerator: $this->cacheKeyGenerator
         );
 
         $result = $executor->doExecute();

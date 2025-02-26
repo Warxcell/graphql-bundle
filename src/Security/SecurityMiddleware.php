@@ -6,13 +6,10 @@ namespace Arxy\GraphQL\Security;
 
 use GraphQL\Type\Definition\ResolveInfo;
 
-final class SecurityMiddleware
+final readonly class SecurityMiddleware
 {
     public function __construct(
-        /**
-         * @var array<string, array<string, string>>
-         */
-        private readonly array $roles
+        private string $role
     ) {
     }
 
@@ -23,9 +20,7 @@ final class SecurityMiddleware
         ResolveInfo $info,
         callable $next
     ): mixed {
-        $role = $this->roles[$info->parentType->name][$info->fieldName] ?? null;
-
-        if ($role && !$context->getSecurity()->isGranted($role)) {
+        if (!$context->getSecurity()->isGranted($this->role)) {
             throw new AuthorizationError();
         }
 

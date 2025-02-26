@@ -64,6 +64,7 @@ final class Configuration implements ConfigurationInterface
                       ->isRequired()
                 ->end()
                 ->scalarNode('operation_execution_result_cache')
+                    ->cannotBeEmpty()
                 ->end()
                 ->scalarNode('cache_dir')
                     ->defaultValue('%kernel.build_dir%/arxy_graphql')
@@ -75,6 +76,14 @@ final class Configuration implements ConfigurationInterface
                 ->scalarNode('promise_adapter')
                     ->defaultValue(PromiseAdapter::class)
                     ->cannotBeEmpty()
+                ->end()
+                ->arrayNode('cache_resolvers')
+                    ->useAttributeAsKey('__object')
+                    ->arrayPrototype()
+                        ->useAttributeAsKey('__field')
+                            ->scalarPrototype()
+                        ->end()
+                    ->end()
                 ->end()
             ->end();
         // @formatter:on
