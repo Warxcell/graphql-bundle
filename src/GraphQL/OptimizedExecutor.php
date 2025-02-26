@@ -268,7 +268,10 @@ class OptimizedExecutor implements ExecutorImplementation
 
         $this->cache->commit();
 
-        $result = $this->buildResponse($data);
+        $result = $this->isPromise($data) ? $data->then(
+            fn($resolved): ExecutionResult => $this->buildResponse($resolved)
+        ) : $this->buildResponse($data);
+
 
         // Note: we deviate here from the reference implementation a bit by always returning promise
         // But for the "sync" case it is always fulfilled
@@ -279,17 +282,8 @@ class OptimizedExecutor implements ExecutorImplementation
         return $this->exeContext->promiseAdapter->createFulfilled($result);
     }
 
-    /**
-     * @param mixed $data
-     *
-     * @return ExecutionResult|Promise
-     */
-    protected function buildResponse($data)
+    protected function buildResponse(mixed $data): ExecutionResult
     {
-        if ($data instanceof Promise) {
-            return $data->then(fn($resolved) => $this->buildResponse($resolved));
-        }
-
         if ($data !== null) {
             $data = (array)$data;
         }

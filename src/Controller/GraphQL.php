@@ -68,11 +68,6 @@ final readonly class GraphQL
     {
         $content = json_encode($result, JSON_THROW_ON_ERROR);
 
-        return $this->createResponse($content);
-    }
-
-    private function createResponse(string $content): Response
-    {
         $response = new Response();
         $response->setContent($content);
         $response->headers->set('Content-Type', 'application/json');
