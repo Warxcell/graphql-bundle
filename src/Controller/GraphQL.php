@@ -174,7 +174,7 @@ final readonly class GraphQL
         $variables = $params['variables'] ?? null;
         $extensions = $params['extensions'] ?? null;
 
-        if (!is_string($query)) {
+        if ($query !== null && !is_string($query)) {
             throw new RequestError(
                 'GraphQL Request parameter "query" must be string, but got '
                 .Utils::printSafeJson($query)
