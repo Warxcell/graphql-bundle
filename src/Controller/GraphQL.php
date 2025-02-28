@@ -38,7 +38,6 @@ final readonly class GraphQL
     }
 
     /**
-     * @throws RequestError
      * @throws JsonException
      */
     public function __invoke(Request $request): Response
