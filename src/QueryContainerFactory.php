@@ -17,7 +17,7 @@ use Psr\Cache\CacheItemPoolInterface;
 use function assert;
 use function md5;
 
-final readonly class QueryContainerFactory
+final readonly class QueryContainerFactory implements QueryContainerFactoryInterface
 {
     public function __construct(
         private Schema $schema,

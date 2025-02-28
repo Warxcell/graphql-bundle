@@ -6,9 +6,7 @@ namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
-use Arxy\GraphQL\Controller\CacheResponseExecutor;
 use Arxy\GraphQL\Controller\Executor;
-use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
@@ -21,7 +19,6 @@ use ReflectionClass;
 use Reflector;
 use Sentry\State\HubInterface;
 use Symfony\Component\Config\FileLocator;
-use Symfony\Component\DependencyInjection\Argument\ServiceLocatorArgument;
 use Symfony\Component\DependencyInjection\ChildDefinition;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\Definition;

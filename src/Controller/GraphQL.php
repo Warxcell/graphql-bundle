@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\OperationParams;
-use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\QueryContainerFactoryInterface;
 use Arxy\GraphQL\QueryError;
 use GraphQL\Error\Error;
 use GraphQL\Executor\ExecutionResult;
@@ -31,7 +31,7 @@ final readonly class GraphQL
     public function __construct(
         /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
-        private QueryContainerFactory $queryContainerFactory,
+        private QueryContainerFactoryInterface $queryContainerFactory,
         private ?ContextFactoryInterface $contextFactory = null,
     ) {
 

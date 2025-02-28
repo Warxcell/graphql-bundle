@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\QueryContainerFactoryInterface;
 use Arxy\GraphQL\QueryError;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\FragmentSpreadNode;
@@ -33,7 +33,7 @@ final readonly class JsonAPI
     public function __construct(
         /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
-        private QueryContainerFactory $queryContainerFactory,
+        private QueryContainerFactoryInterface $queryContainerFactory,
         string $queriesDirectory,
         string $fragmentsDirectory,
         private ?ContextFactoryInterface $contextFactory = null,
