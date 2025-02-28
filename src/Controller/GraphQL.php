@@ -49,11 +49,7 @@ final readonly class GraphQL
             return $this->resultToResponse(new ExecutionResult(null, [Error::createLocatedError($e)]));
         }
         try {
-            $queryContainer = $this->queryContainerFactory->create(
-                $params->query,
-                $params->operationName,
-                $params->variables
-            );
+            $queryContainer = $this->queryContainerFactory->create($params);
         } catch (QueryError $error) {
             return $this->resultToResponse(new ExecutionResult(null, $error->errors));
         }

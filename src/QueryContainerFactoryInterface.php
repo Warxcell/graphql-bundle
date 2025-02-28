@@ -6,9 +6,8 @@ namespace Arxy\GraphQL;
 
 interface QueryContainerFactoryInterface
 {
-
     /**
      * @throws QueryError
      */
-    public function create(string $query, ?string $operationName, ?array $variables): QueryContainer;
+    public function create(OperationParams $params): QueryContainer;
 }

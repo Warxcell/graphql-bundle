@@ -7,11 +7,11 @@ namespace Arxy\GraphQL;
 final readonly class OperationParams
 {
     public function __construct(
-        public string $query,
-        public ?string $operationName,
-        public ?array $variables,
-        public ?array $extensions,
-        public bool $readOnly
+        public ?string $query = null,
+        public ?string $operationName = null,
+        public ?array $variables = null,
+        public ?array $extensions = null,
+        public bool $readOnly = false
     ) {
     }
 }

@@ -28,15 +28,18 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
     /**
      * @throws QueryError
      */
-    public function create(string $query, ?string $operationName, ?array $variables): QueryContainer
+    public function create(OperationParams $params): QueryContainer
     {
-        $queryCacheKey = md5($query);
+        if (null === $params->query) {
+            throw new QueryError([Error::createLocatedError(new RequestError('"query" must be string, but got null'))]);
+        }
+        $queryCacheKey = md5($params->query);
         $cacheItem = $this->queryCache->getItem($queryCacheKey);
 
         if ($cacheItem->isHit()) {
             $documentNode = AST::fromArray($cacheItem->get());
         } else {
-            $documentNode = Parser::parse($query);
+            $documentNode = Parser::parse($params->query);
 
             $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
             assert(
@@ -44,7 +47,7 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
                 'should not register a different rule for QueryComplexity'
             );
 
-            $queryComplexity->setRawVariableValues($variables);
+            $queryComplexity->setRawVariableValues($params->variables);
             $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
 
             if ($validationErrors !== []) {
@@ -55,18 +58,18 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
             $this->queryCache->save($cacheItem);
         }
 
-        $operationDefinitionNode = AST::getOperationAST($documentNode, $operationName);
+        $operationDefinitionNode = AST::getOperationAST($documentNode, $params->operationName);
 
         if ($operationDefinitionNode === null) {
             throw new QueryError([Error::createLocatedError(new RequestError('Failed to determine operation type'))]);
         }
 
         return new QueryContainer(
-            query: $query,
+            query: $params->query,
             cacheKey: $queryCacheKey,
             documentNode: $documentNode,
             operationDefinitionNode: $operationDefinitionNode,
-            variables: $variables,
+            variables: $params->variables,
         );
     }
 }
