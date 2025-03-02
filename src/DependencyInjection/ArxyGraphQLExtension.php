@@ -79,6 +79,7 @@ final class ArxyGraphQLExtension extends Extension
 
         $queryContainerFactoryDef = $container->getDefinition(QueryContainerFactory::class);
         $queryContainerFactoryDef->setArgument('$queryCache', new Reference($config['query_cache']));
+        $queryContainerFactoryDef->setArgument('$hashAlgo', $config['query_hash_algo']);
 
         $executionResultCache = $config['operation_execution_result_cache'];
 

@@ -21,7 +21,8 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
 {
     public function __construct(
         private CacheItemPoolInterface $queryCache,
-        private QueryValidator $queryValidator
+        private QueryValidator $queryValidator,
+        private string $hashAlgo = 'md5'
     ) {
     }
 
@@ -33,7 +34,7 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
         if (null === $params->query) {
             throw new QueryError([Error::createLocatedError(new RequestError('"query" must be string, but got null'))]);
         }
-        $queryCacheKey = md5($params->query);
+        $queryCacheKey = hash($this->hashAlgo, $params->query);
         $cacheItem = $this->queryCache->getItem($queryCacheKey);
 
         if ($cacheItem->isHit()) {
