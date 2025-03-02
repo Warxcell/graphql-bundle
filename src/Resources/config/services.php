@@ -17,7 +17,6 @@ use Arxy\GraphQL\QueryContainerFactoryInterface;
 use Arxy\GraphQL\QueryValidator;
 use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\SchemaBuilder;
-use Arxy\GraphQL\Security\SecurityMiddleware;
 use GraphQL\Type\Schema;
 use Psr\Log\LogLevel;
 
