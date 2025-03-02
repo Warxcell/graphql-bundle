@@ -20,8 +20,8 @@ use function md5;
 final readonly class QueryContainerFactory implements QueryContainerFactoryInterface
 {
     public function __construct(
-        private Schema $schema,
         private CacheItemPoolInterface $queryCache,
+        private QueryValidator $queryValidator
     ) {
     }
 
@@ -41,18 +41,7 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
         } else {
             $documentNode = Parser::parse($params->query);
 
-            $queryComplexity = DocumentValidator::getRule(QueryComplexity::class);
-            assert(
-                $queryComplexity instanceof QueryComplexity,
-                'should not register a different rule for QueryComplexity'
-            );
-
-            $queryComplexity->setRawVariableValues($params->variables);
-            $validationErrors = DocumentValidator::validate($this->schema, $documentNode);
-
-            if ($validationErrors !== []) {
-                throw new QueryError($validationErrors);
-            }
+            $this->queryValidator->validate($documentNode, $params->variables);
 
             $cacheItem->set(AST::toArray($documentNode));
             $this->queryCache->save($cacheItem);
