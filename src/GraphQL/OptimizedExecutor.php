@@ -691,16 +691,28 @@ class OptimizedExecutor implements ExecutorImplementation
             ?? $parentType->argsMapper
             ?? $this->exeContext->argsMapper;
 
-        $args = $this->fieldArgsCache[$fieldDef][$fieldNode] ??= $argsMapper(
-            Values::getArgumentValues(
+        try {
+            $args = $this->fieldArgsCache[$fieldDef][$fieldNode] ??= $argsMapper(
+                Values::getArgumentValues(
+                    $fieldDef,
+                    $fieldNode,
+                    $this->exeContext->variableValues
+                ),
                 $fieldDef,
                 $fieldNode,
-                $this->exeContext->variableValues
-            ),
-            $fieldDef,
-            $fieldNode,
-            $contextValue
-        );
+                $contextValue
+            );
+        } catch (\Throwable $exception) {
+            return $this->completeValueCatchingError(
+                $returnType,
+                $fieldNodes,
+                $info,
+                $path,
+                $unaliasedPath,
+                $exception,
+                $contextValue
+            );
+        }
 
         if (null !== $fieldDef->cacheResolver && null !== ($cacheConfig = ($fieldDef->cacheResolver)(
                 $rootValue,
