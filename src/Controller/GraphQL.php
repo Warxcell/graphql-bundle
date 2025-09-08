@@ -89,7 +89,21 @@ final readonly class GraphQL
 
         switch ($method) {
             case 'GET':
-                return $this->validateOperationParams($request->query->all(), true);
+                $queryParams = $request->query->all();
+
+                if (isset($queryParams['variables']) && is_string($queryParams['variables'])) {
+                    try {
+                        $queryParams['variables'] = json_decode(
+                            $queryParams['variables'],
+                            true,
+                            512,
+                            JSON_THROW_ON_ERROR
+                        );
+                    } catch (JsonException) {
+                    }
+                }
+
+                return $this->validateOperationParams($queryParams, true);
 
             case 'POST':
                 $contentType = $request->headers->get('Content-Type');
