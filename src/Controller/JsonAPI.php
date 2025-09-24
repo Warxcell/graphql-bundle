@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL\Controller;
 
-use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\OperationParams;
+use Arxy\GraphQL\QueryContainerFactoryInterface;
 use Arxy\GraphQL\QueryError;
 use GraphQL\Language\AST\FragmentDefinitionNode;
 use GraphQL\Language\AST\FragmentSpreadNode;
@@ -33,7 +34,7 @@ final readonly class JsonAPI
     public function __construct(
         /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
-        private QueryContainerFactory $queryContainerFactory,
+        private QueryContainerFactoryInterface $queryContainerFactory,
         string $queriesDirectory,
         string $fragmentsDirectory,
         private ?ContextFactoryInterface $contextFactory = null,
@@ -161,7 +162,12 @@ final readonly class JsonAPI
         }
 
         try {
-            $queryContainer = $this->queryContainerFactory->create($operation, null, $variables);
+            $queryContainer = $this->queryContainerFactory->create(
+                new OperationParams(
+                    query: $operation,
+                    variables: $variables
+                )
+            );
         } catch (QueryError $error) {
             return new JsonResponse([
                 'errors' => $error->errors,

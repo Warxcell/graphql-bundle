@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!--
+  ~ Copyright (C) 2016-2022 Taylor & Hart Limited
+  ~ All Rights Reserved.
+  ~
+  ~ NOTICE: All information contained herein is, and remains the property
+  ~ of Taylor & Hart Limited and its suppliers, if any.
+  ~
+  ~ All   intellectual   and  technical  concepts  contained  herein  are
+  ~ proprietary  to  Taylor & Hart Limited  and  its suppliers and may be
+  ~ covered  by  U.K.  and  foreign  patents, patents in process, and are
+  ~ protected in full by copyright law. Dissemination of this information
+  ~ or  reproduction  of this material is strictly forbidden unless prior
+  ~ written permission is obtained from Taylor & Hart Limited.
+  ~
+  ~ ANY  REPRODUCTION, MODIFICATION, DISTRIBUTION, PUBLIC PERFORMANCE, OR
+  ~ PUBLIC  DISPLAY  OF  OR  THROUGH  USE OF THIS SOURCE CODE WITHOUT THE
+  ~ EXPRESS  WRITTEN CONSENT OF RARE PINK LIMITED IS STRICTLY PROHIBITED,
+  ~ AND  IN  VIOLATION  OF  APPLICABLE LAWS. THE RECEIPT OR POSSESSION OF
+  ~ THIS  SOURCE CODE AND/OR RELATED INFORMATION DOES NOT CONVEY OR IMPLY
+  ~ ANY  RIGHTS  TO REPRODUCE, DISCLOSE OR DISTRIBUTE ITS CONTENTS, OR TO
+  ~ MANUFACTURE,  USE, OR SELL ANYTHING THAT IT MAY DESCRIBE, IN WHOLE OR
+  ~ IN PART.
+  -->
+
+<!-- https://phpunit.readthedocs.io/en/latest/configuration.html -->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         backupGlobals="false"
+         colors="true"
+         bootstrap="tests/bootstrap.php"
+         displayDetailsOnTestsThatTriggerDeprecations="true"
+         displayDetailsOnTestsThatTriggerErrors="true"
+         displayDetailsOnTestsThatTriggerNotices="true"
+         displayDetailsOnTestsThatTriggerWarnings="true"
+>
+
+    <testsuites>
+        <testsuite name="Tests">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+
+
+    <logging>
+        <junit outputFile=".phpunit/junit.xml"/>
+    </logging>
+
+    <!-- Run `composer require symfony/panther` before enabling this extension -->
+</phpunit>

@@ -5,14 +5,9 @@ declare(strict_types=1);
 namespace Arxy\GraphQL;
 
 use Arxy\GraphQL\Debug\TimingMiddleware;
-use Arxy\GraphQL\Security\SecurityCompilerPass;
 use Arxy\GraphQL\Security\SecurityMiddleware;
 use Closure;
-use GraphQL\Language\AST\NodeKind;
-use GraphQL\Language\AST\ObjectTypeDefinitionNode;
-use GraphQL\Language\AST\ObjectTypeExtensionNode;
 use GraphQL\Language\AST\StringValueNode;
-use GraphQL\Language\Visitor;
 use GraphQL\Type\Definition\EnumType;
 use GraphQL\Type\Definition\InputObjectType;
 use GraphQL\Type\Definition\InterfaceType;
@@ -63,6 +58,13 @@ final class ArxyGraphQLBundle extends Bundle
                     $resolversDebugInfo = [];
 
                     $uncheckedEnums = $enumsMapping;
+
+                    $middlewares = array_reverse(
+                        $container->getParameter('arxy.graphql.middlewares')
+                    );
+                    if ($debug) {
+                        $middlewares[] = TimingMiddleware::class;
+                    }
 
                     foreach ($container->findTaggedServiceIds('arxy.graphql.resolver') as $serviceId => $tags) {
                         $service = $container->getDefinition($serviceId);
@@ -171,26 +173,58 @@ final class ArxyGraphQLBundle extends Bundle
                                         }
 
                                         $resolverInfo = [];
-                                        $field = $method->getName();
+                                        $fieldName = $method->getName();
 
-                                        if (isset($resolvers[$graphqlName][$field])) {
+                                        if (isset($resolvers[$graphqlName][$fieldName])) {
                                             throw new LogicException(
-                                                sprintf('Multiple resolvers exists for %s.%s', $graphqlName, $field)
+                                                sprintf('Multiple resolvers exists for %s.%s', $graphqlName, $fieldName)
                                             );
                                         }
 
-                                        $resolver = [new Reference($serviceId), $field];
-                                        $resolverInfo[] = [$serviceId, $field];
+                                        $field = $type->getField($fieldName);
+
+                                        foreach ($field->astNode->directives as $directive) {
+                                            if ($directive->name->value === 'isGranted') {
+                                                foreach ($directive->arguments as $argument) {
+                                                    if ($argument->name->value === 'role') {
+                                                        if (!$argument->value instanceof StringValueNode) {
+                                                            throw new LogicException('Role argument not String');
+                                                        }
+                                                        $role = $argument->value->value;
+
+                                                        $securityMiddlewareDef = new Definition(
+                                                            SecurityMiddleware::class
+                                                        );
+                                                        $securityMiddlewareDef->setArgument('$role', $role);
+
+                                                        $id = sprintf(
+                                                            'graphql.security.%s.%s',
+                                                            $graphqlName,
+                                                            $fieldName
+                                                        );
+                                                        $container->setDefinition($id, $securityMiddlewareDef);
+
+                                                        $middlewares[$graphqlName][$fieldName][] = $id;
+
+                                                        break 2;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+
+                                        $resolver = [new Reference($serviceId), $fieldName];
+                                        $resolverInfo[] = [$serviceId, $fieldName];
 
                                         $actuallyWrapResolver = function ($resolver, $serviceId) use (
                                             $container,
                                             $graphqlName,
-                                            $field
+                                            $fieldName
                                         ) {
                                             $middlewareDefId = sprintf(
                                                 'arxy.graphql.middleware.%s.%s.%s',
                                                 $graphqlName,
-                                                $field,
+                                                $fieldName,
                                                 $serviceId
                                             );
                                             $middlewareDef = new Definition(
@@ -210,7 +244,7 @@ final class ArxyGraphQLBundle extends Bundle
                                         $wrapResolver = function ($middlewareId) use (
                                             $container,
                                             $graphqlName,
-                                            $field,
+                                            $fieldName,
                                             &$resolver,
                                             $debug,
                                             &$actuallyWrapResolver,
@@ -219,15 +253,6 @@ final class ArxyGraphQLBundle extends Bundle
                                             $resolverInfo[] = $middlewareId;
                                             $resolver = $actuallyWrapResolver($resolver, $middlewareId);
                                         };
-
-                                        $middlewares = array_reverse(
-                                            $container->getParameter('arxy.graphql.middlewares')
-                                        );
-
-                                        $middlewares[] = SecurityMiddleware::class;
-                                        if ($debug) {
-                                            $middlewares[] = TimingMiddleware::class;
-                                        }
 
                                         foreach ($middlewares as $graphqlNameOrInt => $middlewareOrFields) {
                                             if (is_int($graphqlNameOrInt)) {
@@ -244,16 +269,16 @@ final class ArxyGraphQLBundle extends Bundle
                                             ) {
                                                 if (is_int($fieldOrInt)) {
                                                     $wrapResolver($middlewareOrField);
-                                                } elseif ($fieldOrInt === $field) {
+                                                } elseif ($fieldOrInt === $fieldName) {
                                                     foreach (array_reverse($middlewareOrField) as $middleware) {
                                                         $wrapResolver($middleware);
                                                     }
                                                 }
                                             }
                                         }
-                                        $resolvers[$graphqlName][$field] = $resolver;
+                                        $resolvers[$graphqlName][$fieldName] = $resolver;
 
-                                        $resolversDebugInfo[$graphqlName][$field] = array_reverse($resolverInfo);
+                                        $resolversDebugInfo[$graphqlName][$fieldName] = array_reverse($resolverInfo);
                                     }
                                     break;
                                 default:
@@ -330,7 +355,5 @@ final class ArxyGraphQLBundle extends Bundle
                 }
             }
         );
-
-        $container->addCompilerPass(new SecurityCompilerPass());
     }
 }

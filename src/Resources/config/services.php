@@ -13,9 +13,10 @@ use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
 use Arxy\GraphQL\ErrorsHandler;
 use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\QueryContainerFactoryInterface;
+use Arxy\GraphQL\QueryValidator;
 use Arxy\GraphQL\RequestHandler;
 use Arxy\GraphQL\SchemaBuilder;
-use Arxy\GraphQL\Security\SecurityMiddleware;
 use GraphQL\Type\Schema;
 use Psr\Log\LogLevel;
 
@@ -46,6 +47,7 @@ return function (ContainerConfigurator $configurator) {
     $services->set(RequestHandler::class);
 
     $services->set(QueryContainerFactory::class);
+    $services->alias(QueryContainerFactoryInterface::class, QueryContainerFactory::class);
 
     $services->set(Executor::class);
     $services->alias(ExecutorInterface::class, Executor::class);
@@ -55,5 +57,5 @@ return function (ContainerConfigurator $configurator) {
 
     $services->set(CacheWarmer::class);
 
-    $services->set(SecurityMiddleware::class);
+    $services->set(QueryValidator::class);
 };

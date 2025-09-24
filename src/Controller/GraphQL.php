@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL\Controller;
 
 use Arxy\GraphQL\OperationParams;
-use Arxy\GraphQL\QueryContainerFactory;
+use Arxy\GraphQL\QueryContainerFactoryInterface;
 use Arxy\GraphQL\QueryError;
 use GraphQL\Error\Error;
 use GraphQL\Executor\ExecutionResult;
@@ -31,14 +31,13 @@ final readonly class GraphQL
     public function __construct(
         /** @var ExecutorInterface<mixed> */
         private ExecutorInterface $executor,
-        private QueryContainerFactory $queryContainerFactory,
+        private QueryContainerFactoryInterface $queryContainerFactory,
         private ?ContextFactoryInterface $contextFactory = null,
     ) {
 
     }
 
     /**
-     * @throws RequestError
      * @throws JsonException
      */
     public function __invoke(Request $request): Response
@@ -49,11 +48,7 @@ final readonly class GraphQL
             return $this->resultToResponse(new ExecutionResult(null, [Error::createLocatedError($e)]));
         }
         try {
-            $queryContainer = $this->queryContainerFactory->create(
-                $params->query,
-                $params->operationName,
-                $params->variables
-            );
+            $queryContainer = $this->queryContainerFactory->create($params);
         } catch (QueryError $error) {
             return $this->resultToResponse(new ExecutionResult(null, $error->errors));
         }
@@ -68,11 +63,6 @@ final readonly class GraphQL
     {
         $content = json_encode($result, JSON_THROW_ON_ERROR);
 
-        return $this->createResponse($content);
-    }
-
-    private function createResponse(string $content): Response
-    {
         $response = new Response();
         $response->setContent($content);
         $response->headers->set('Content-Type', 'application/json');
@@ -198,7 +188,7 @@ final readonly class GraphQL
         $variables = $params['variables'] ?? null;
         $extensions = $params['extensions'] ?? null;
 
-        if (!is_string($query)) {
+        if ($query !== null && !is_string($query)) {
             throw new RequestError(
                 'GraphQL Request parameter "query" must be string, but got '
                 .Utils::printSafeJson($query)

@@ -6,9 +6,7 @@ namespace Arxy\GraphQL\DependencyInjection;
 
 use Arxy\GraphQL\CachedDocumentNodeProvider;
 use Arxy\GraphQL\Command\DumpSchemaCommand;
-use Arxy\GraphQL\Controller\CachedExecutor;
 use Arxy\GraphQL\Controller\Executor;
-use Arxy\GraphQL\Controller\ExecutorInterface;
 use Arxy\GraphQL\Controller\GraphQL;
 use Arxy\GraphQL\DocumentNodeProvider;
 use Arxy\GraphQL\DocumentNodeProviderInterface;
@@ -65,6 +63,15 @@ final class ArxyGraphQLExtension extends Extension
         $executableSchemaBuilderDef->setArgument('$inputObjectsMapping', $config['input_objects_mapping']);
         $executableSchemaBuilderDef->setArgument('$argumentsMapping', $config['arguments_mapping']);
 
+        $cacheResolvers = [];
+        foreach ($config['cache_resolvers'] as $objectName => $fields) {
+            foreach ($fields as $fieldName => $cacheResolver) {
+                $cacheResolvers[$objectName][$fieldName] = new Reference($cacheResolver);
+            }
+        }
+
+        $executableSchemaBuilderDef->setArgument('$cacheResolvers', $cacheResolvers);
+
         $container->setParameter('arxy.graphql.middlewares', $config['middlewares']);
 
         $controllerDef = $container->getDefinition(GraphQL::class);
@@ -72,23 +79,25 @@ final class ArxyGraphQLExtension extends Extension
 
         $queryContainerFactoryDef = $container->getDefinition(QueryContainerFactory::class);
         $queryContainerFactoryDef->setArgument('$queryCache', new Reference($config['query_cache']));
+        $queryContainerFactoryDef->setArgument('$hashAlgo', $config['query_hash_algo']);
+
+        $executionResultCache = $config['operation_execution_result_cache'];
 
         $executorDef = $container->getDefinition(Executor::class);
         $executorDef->setArgument('$promiseAdapter', new Reference($config['promise_adapter']));
         $executorDef->setArgument('$debug', $debug);
         $executorDef->setArgument('$errorsHandler', new Reference($config['errors_handler']));
+        $executorDef->setArgument('$cacheItemPool', new Reference($executionResultCache));
 
-        $executionResultCache = $config['operation_execution_result_cache'] ?? null;
+//
+//        $cachedExecutorDef = new Definition(CacheResponseExecutor::class);
+//        $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
+//        $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
+//        $cachedExecutorDef->setAutoconfigured(true);
+//        $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
+//
+//        $container->setDefinition(CacheResponseExecutor::class, $cachedExecutorDef);
 
-        if ($executionResultCache) {
-            $cachedExecutorDef = new Definition(CachedExecutor::class);
-            $cachedExecutorDef->setArgument('$executor', new Reference('.inner'));
-            $cachedExecutorDef->setArgument('$cache', new Reference($executionResultCache));
-            $cachedExecutorDef->setAutoconfigured(true);
-            $cachedExecutorDef->setDecoratedService(ExecutorInterface::class);
-
-            $container->setDefinition(CachedExecutor::class, $cachedExecutorDef);
-        }
 
         $dumpSchemaCommand = $container->getDefinition(DumpSchemaCommand::class);
         $dumpSchemaCommand->setArgument('$location', $config['schema_dump_location']);
