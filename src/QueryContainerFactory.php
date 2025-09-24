@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Arxy\GraphQL;
 
 use GraphQL\Error\Error;
+use GraphQL\Error\SyntaxError;
 use GraphQL\Language\Parser;
 use GraphQL\Server\RequestError;
 use GraphQL\Type\Schema;
@@ -40,7 +41,11 @@ final readonly class QueryContainerFactory implements QueryContainerFactoryInter
         if ($cacheItem->isHit()) {
             $documentNode = AST::fromArray($cacheItem->get());
         } else {
-            $documentNode = Parser::parse($params->query);
+            try {
+                $documentNode = Parser::parse($params->query);
+            } catch (SyntaxError|\JsonException $e) {
+                throw new QueryError([$e], previous: $e);
+            }
 
             $this->queryValidator->validate($documentNode, $params->variables);
 

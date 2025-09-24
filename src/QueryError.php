@@ -14,8 +14,9 @@ final class QueryError extends Exception
         /**
          * @var array<int, Error>
          */
-        public readonly array $errors
+        public readonly array $errors,
+        ?Throwable $previous = null,
     ) {
-        parent::__construct('Failed to create query');
+        parent::__construct('Failed to create query', previous: $previous);
     }
 }
