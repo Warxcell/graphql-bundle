@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Arxy\GraphQL;
 
+use GraphQL\Error\Error;
 use GraphQL\Executor\ExecutionResult;
-use Throwable;
 
 /**
  * @phpstan-import-type ErrorFormatter from ExecutionResult
@@ -14,7 +14,7 @@ use Throwable;
 interface ErrorsHandlerInterface
 {
     /**
-     * @param list<Throwable> $errors
+     * @param list<Error> $errors
      * @param ErrorFormatter $formatter
      * @return SerializableErrors
      */

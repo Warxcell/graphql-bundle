@@ -23,7 +23,10 @@ final class ErrorsHandler implements ErrorsHandlerInterface
         $formatted = [];
         foreach ($errors as $error) {
             if (!($error instanceof ClientAware && $error->isClientSafe())) {
-                $this->logger->log($this->logLevel, $error->getMessage(), ['exception' => $error]);
+                $this->logger->log($this->logLevel, $error->getMessage(), [
+                    'exception' => $error,
+                    'path' => $error->getPath(),
+                ]);
             }
 
             $formatted[] = $formatter($error);
